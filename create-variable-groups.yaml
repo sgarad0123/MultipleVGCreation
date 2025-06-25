@@ -5,9 +5,6 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  # These variable groups are assumed to contain:
-  # vg-create-vg-source: ORG, PROJECT, track1_name, track1_type, track1_appid, track1_apptype
-  # devops-secrets-vg: AZURE_DEVOPS_PAT (marked as secret)
   - group: vg-create-vg-source
   - group: devops-secrets-vg
 
@@ -17,11 +14,13 @@ parameters:
     default: ['DEV', 'SIT', 'UAT', 'PT', 'PROD', 'DR']
 
 steps:
-  - task: Bash@3
-    displayName: "⚙️ Install jq and set permissions"
-    inputs:
-      targetType: 'inline'
-      script: |
+  # Task 1: Install jq and set permissions
+  - task: Bash@3 # Indent 2 spaces from 'steps:'
+    displayName: "⚙️ Install jq and set permissions" # Indent 4 spaces from '- task:'
+    inputs: # Indent 4 spaces from '- task:'
+      targetType: 'inline' # Indent 6 spaces from 'inputs:'
+      script: | # Indent 6 spaces from 'inputs:'
+        # All lines of the script must be indented 2 spaces further than 'script: |'
         echo "Installing jq for JSON processing..."
         sudo apt-get update && sudo apt-get install -y jq
         echo "jq installed."
@@ -30,24 +29,25 @@ steps:
         chmod +x ./create-multi-env-vgs.sh
         echo "Permissions set."
 
-  - task: Bash@3
-    displayName: "🚀 Create Variable Groups"
-    inputs:
-      targetType: 'inline'
-      # CORRECTED INDENTATION: 'env' should be at the same level as 'targetType' and 'script'
-      env:
-        ORG: $(ORG)
-        PROJECT: $(PROJECT)
-        AZURE_DEVOPS_PAT: $(AZURE_DEVOPS_PAT) # This is a secret variable
-        # Pass track1 variables directly
-        TRACK1_NAME: $(track1_name)
-        TRACK1_TYPE: $(track1_type)
-        TRACK1_APPID: $(track1_appid)
-        TRACK1_APPTYPE: $(track1_apptype)
-      script: |
+  # Task 2: Create Variable Groups
+  - task: Bash@3 # Indent 2 spaces from 'steps:'
+    displayName: "🚀 Create Variable Groups" # Indent 4 spaces from '- task:'
+    inputs: # Indent 4 spaces from '- task:'
+      targetType: 'inline' # Indent 6 spaces from 'inputs:'
+      # THIS IS THE CRITICAL SECTION FOR YOUR ERROR.
+      # Ensure 'env:' is at the *exact same* indentation level as 'targetType:' and 'script:'
+      env: # <--- Make sure 'env:' is indented 6 spaces from 'inputs:'
+        ORG: $(ORG) # Indent 8 spaces from 'env:'
+        PROJECT: $(PROJECT) # Indent 8 spaces from 'env:'
+        AZURE_DEVOPS_PAT: $(AZURE_DEVOPS_PAT) # Indent 8 spaces from 'env:'
+        TRACK1_NAME: $(track1_name) # Indent 8 spaces from 'env:'
+        TRACK1_TYPE: $(track1_type) # Indent 8 spaces from 'env:'
+        TRACK1_APPID: $(track1_appid) # Indent 8 spaces from 'env:'
+        TRACK1_APPTYPE: $(track1_apptype) # Indent 8 spaces from 'env:'
+      script: | # Indent 6 spaces from 'inputs:'
+        # All lines of the script must be indented 2 spaces further than 'script: |'
         echo "Starting Variable Group Creation process..."
 
-        # Access environment variables directly, no need for export-vars.sh
         ORG="${ORG}"
         PROJECT="${PROJECT}"
         AZURE_DEVOPS_PAT="${AZURE_DEVOPS_PAT}"
@@ -66,8 +66,6 @@ steps:
         echo "🧩 Track 1 details: name=$trackname, type=$tracktype, appid=$appid, apptype=$apptype"
         echo "Azure DevOps Org: $ORG, Project: $PROJECT"
 
-        # Convert the environments parameter array into a space-separated string for Bash
-        # This resolves the "Unable to convert from Array to String" error
         environments_str="${{ join(' ', parameters.environments) }}"
         IFS=' ' read -r -a environments_array <<< "$environments_str"
 
@@ -75,7 +73,6 @@ steps:
 
         for env in "${environments_array[@]}"; do
           echo "➡️ Attempting to create variable group for environment: $env"
-          # Pass ORG, PROJECT, and PAT directly as arguments to the script
           ./create-multi-env-vgs.sh "$env" "$appid" "$trackname" "$tracktype" "$apptype" "$ORG" "$PROJECT" "$AZURE_DEVOPS_PAT"
         done
 
