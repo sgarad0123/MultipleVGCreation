@@ -20,7 +20,7 @@ if [[ -z "$ORG" || -z "$PROJECT" || -z "$AZURE_DEVOPS_PAT" ]]; then
   exit 1
 fi
 
-# Encode PAT for Basic Auth
+# Encode PAT
 ENCODED_PAT=$(printf ":%s" "$AZURE_DEVOPS_PAT" | base64 | tr -d '\n')
 AUTH_HEADER="Authorization: Basic $ENCODED_PAT"
 
@@ -63,7 +63,16 @@ fi
 # Construct variable group name
 vg_name="${env}-${appid}-${trackname}-VG"
 
-# Construct image path and secret name
+# Check if variable group already exists
+VG_CHECK_URL="https://dev.azure.com/$ORG/$PROJECT/_apis/distributedtask/variablegroups?groupName=$vg_name&api-version=7.1-preview.2"
+VG_EXISTS=$(curl -s -H "$AUTH_HEADER" "$VG_CHECK_URL" | jq -r '.value | length')
+
+if [[ "$VG_EXISTS" -gt 0 ]]; then
+  echo "✅ Variable group $vg_name already exists. Skipping..."
+  exit 0
+fi
+
+# Construct sys values
 imagePath="\$(ACRPath-NonProd)/\$(${appid}-${trackname}-ACRRepositoryName)"
 secretName=$(echo "${env}-${appid}-${tracktype}-${trackname}-secret" | tr '[:upper:]' '[:lower:]')
 
@@ -96,7 +105,7 @@ VARIABLES_JSON+="}"
 
 echo "$VARIABLES_JSON" > variables.json
 
-# Build request body
+# Build final request payload
 BODY=$(jq -n \
   --arg name "$vg_name" \
   --arg projectId "$PROJECT_ID" \
@@ -117,7 +126,7 @@ BODY=$(jq -n \
     ]
   }')
 
-# Show payload for debugging
+# Show payload
 echo "📦 JSON payload to be sent:"
 echo "$BODY" | jq .
 
@@ -136,9 +145,7 @@ if [[ "$HTTP_CODE" -ge 400 || "$HTTP_CODE" -eq 000 ]]; then
   echo "❌ ERROR: Failed to create variable group: $vg_name"
   echo "🔎 API Response:"
   cat "$RESPONSE_FILE"
-  # Uncomment the next line if you want to fail fast
-  # exit 1
-  echo "⚠️ Skipping and continuing to next..."
+  echo "⚠️ Skipping and continuing..."
 else
   echo "✅ Variable group $vg_name created successfully!"
 fi
