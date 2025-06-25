@@ -11,7 +11,7 @@ pool:
 
 variables:
   - group: vg-create-vg-source
-  - group: devops-secrets-vg 
+  - group: devops-secrets-vg
 
 steps:
   - script: |
@@ -21,13 +21,17 @@ steps:
       environments="${{ join(',', parameters.environments) }}"
       IFS=',' read -ra ENV_LIST <<< "$environments"
 
-      # Export Azure DevOps variables as shell environment variables
-      echo "📤 Exporting variable group contents to shell environment"
-      set -o allexport
-      source <(env | grep '^track[0-9]*_' || true)
-      set +o allexport
+      # Manually export all track variables
+      export TRACKCOUNT=$(echo "$(TRACKCOUNT)")
+      export track1_name="$(track1_name)"
+      export track1_type="$(track1_type)"
+      export track1_appid="$(track1_appid)"
+      export track2_name="$(track2_name)"
+      export track2_type="$(track2_type)"
+      export track2_appid="$(track2_appid)"
+      # Add more if TRACKCOUNT > 2
 
-      echo "Found TRACKCOUNT=$TRACKCOUNT from variable group"
+      echo "Found TRACKCOUNT=$TRACKCOUNT"
 
       for ((i=1; i<=${TRACKCOUNT}; i++)); do
         trackname=$(eval echo "\$track${i}_name")
