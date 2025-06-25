@@ -11,13 +11,7 @@ variables:
 parameters:
   - name: environments
     type: object
-    default:
-      - DEV
-      - SIT
-      - UAT
-      - PT
-      - PROD
-      - DR
+    default: ['DEV', 'SIT', 'UAT', 'PT', 'PROD', 'DR']
 
 steps:
   - task: Bash@3
@@ -27,19 +21,26 @@ steps:
       targetType: 'inline'
       script: |
         echo "🔧 Generating export-vars.sh..."
-
-        echo '#!/bin/bash' > export-vars.sh
-        echo "export ORG=\"${ORG}\"" >> export-vars.sh
-        echo "export PROJECT=\"${PROJECT}\"" >> export-vars.sh
-        echo "export AZURE_DEVOPS_PAT=\"${AZURE_DEVOPS_PAT}\"" >> export-vars.sh
-        echo "export TRACKCOUNT=1" >> export-vars.sh
-        echo "export track1_name=\"${track1_name}\"" >> export-vars.sh
-        echo "export track1_type=\"${track1_type}\"" >> export-vars.sh
-        echo "export track1_appid=\"${track1_appid}\"" >> export-vars.sh
-        echo "export track1_apptype=\"${track1_apptype}\"" >> export-vars.sh
-
+        cat > export-vars.sh <<EOF
+#!/bin/bash
+export ORG="${ORG}"
+export PROJECT="${PROJECT}"
+export AZURE_DEVOPS_PAT="${AZURE_DEVOPS_PAT}"
+export TRACKCOUNT=1
+export track1_name="${track1_name}"
+export track1_type="${track1_type}"
+export track1_appid="${track1_appid}"
+export track1_apptype="${track1_apptype}"
+EOF
         chmod +x export-vars.sh
         echo "✅ export-vars.sh created"
+
+  - task: Bash@3
+    displayName: 📜 Make create-multi-env-vgs.sh executable
+    inputs:
+      targetType: 'inline'
+      script: |
+        chmod +x ./create-multi-env-vgs.sh
 
   - task: Bash@3
     name: CreateVariableGroups
@@ -50,8 +51,6 @@ steps:
         source ./export-vars.sh
 
         echo "🔁 Environments to process: ${{ join(',', parameters.environments) }}"
-        ENV_LIST="${{ join(',', parameters.environments) }}"
-        IFS=',' read -ra ENV_ARRAY <<< "$ENV_LIST"
 
         trackname="${track1_name}"
         tracktype="${track1_type}"
@@ -60,7 +59,7 @@ steps:
 
         echo "🧩 Track 1: name=$trackname, type=$tracktype, appid=$appid, apptype=$apptype"
 
-        for env in "${ENV_ARRAY[@]}"; do
+        for env in "${{ parameters.environments[@] }}"; do
           echo "➡️ Creating variable group for $env - $appid - $trackname"
           ./create-multi-env-vgs.sh "$env" "$appid" "$trackname" "$tracktype" "$apptype"
         done
