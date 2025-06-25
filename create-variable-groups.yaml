@@ -36,6 +36,7 @@ EOF
         echo "✅ export-vars.sh created"
 
   - task: Bash@3
+    name: MakeScriptExecutable
     displayName: "📜 Make create-multi-env-vgs.sh executable"
     inputs:
       targetType: 'inline'
@@ -50,8 +51,8 @@ EOF
       script: |
         source ./export-vars.sh
 
-        environments="${{ join(',', parameters.environments) }}"
-        IFS=',' read -ra ENV_LIST <<< "$environments"
+        ENVIRONMENTS="${{ join(',', parameters.environments) }}"
+        IFS=',' read -ra ENV_LIST <<< "$ENVIRONMENTS"
 
         trackname="${track1_name}"
         tracktype="${track1_type}"
