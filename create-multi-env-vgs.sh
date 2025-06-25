@@ -14,13 +14,13 @@ if [[ -z "$env" || -z "$appid" || -z "$trackname" || -z "$tracktype" ]]; then
   exit 1
 fi
 
-# Validate required variables
+# Validate required environment variables
 if [[ -z "$ORG" || -z "$PROJECT" || -z "$AZURE_DEVOPS_PAT" ]]; then
-  echo "❌ ERROR: Missing org, project or PAT env variables"
+  echo "❌ ERROR: Missing ORG, PROJECT or AZURE_DEVOPS_PAT"
   exit 1
 fi
 
-# Encode PAT
+# Encode PAT for Basic Auth
 ENCODED_PAT=$(printf ":%s" "$AZURE_DEVOPS_PAT" | base64 | tr -d '\n')
 AUTH_HEADER="Authorization: Basic $ENCODED_PAT"
 
@@ -29,7 +29,7 @@ PROJECT_ID=$(curl -s -H "$AUTH_HEADER" \
   "https://dev.azure.com/$ORG/_apis/projects/$PROJECT?api-version=7.1-preview.1" | jq -r '.id')
 
 if [[ "$PROJECT_ID" == "null" || -z "$PROJECT_ID" ]]; then
-  echo "❌ ERROR: Failed to fetch project ID for $PROJECT"
+  echo "❌ ERROR: Could not retrieve project ID for project $PROJECT"
   exit 1
 fi
 
@@ -63,13 +63,20 @@ fi
 # Construct variable group name
 vg_name="${env}-${appid}-${trackname}-VG"
 
-# Construct image path
+# Construct image path and secret name
 imagePath="\$(ACRPath-NonProd)/\$(${appid}-${trackname}-ACRRepositoryName)"
-
-# Construct secret resource name (lowercase)
 secretName=$(echo "${env}-${appid}-${tracktype}-${trackname}-secret" | tr '[:upper:]' '[:lower:]')
 
-# Always include MSI-Identitybinding
+# Debug output
+echo "----------------------------------------"
+echo "🔧 Creating Variable Group: $vg_name"
+echo "📌 ACR Image Path: $imagePath"
+echo "📌 Namespace: $namespace"
+echo "📌 AppCriticality: $appCriticality"
+echo "📌 Secret Resource Name: $secretName"
+echo "----------------------------------------"
+
+# Build variables JSON
 declare -A variables=(
   ["MSI-Identitybinding"]="default"
   ["sys-AppCriticality"]="$appCriticality"
@@ -78,7 +85,6 @@ declare -A variables=(
   ["sys-SecretResourceName"]="$secretName"
 )
 
-# Create JSON
 VARIABLES_JSON="{"
 i=0
 for key in "${!variables[@]}"; do
@@ -90,7 +96,7 @@ VARIABLES_JSON+="}"
 
 echo "$VARIABLES_JSON" > variables.json
 
-# Prepare payload
+# Build request body
 BODY=$(jq -n \
   --arg name "$vg_name" \
   --arg projectId "$PROJECT_ID" \
@@ -111,6 +117,10 @@ BODY=$(jq -n \
     ]
   }')
 
+# Show payload for debugging
+echo "📦 JSON payload to be sent:"
+echo "$BODY" | jq .
+
 # Send request
 URL="https://dev.azure.com/$ORG/$PROJECT/_apis/distributedtask/variablegroups?api-version=7.1-preview.2"
 RESPONSE_FILE=$(mktemp)
@@ -120,11 +130,15 @@ HTTP_CODE=$(curl --http1.1 -s -w "%{http_code}" -o "$RESPONSE_FILE" -X POST \
   -H "Content-Type: application/json" \
   -d "$BODY" "$URL")
 
-echo "📡 Response Code: $HTTP_CODE"
-cat "$RESPONSE_FILE"
+echo "📡 HTTP Response Code: $HTTP_CODE"
 
 if [[ "$HTTP_CODE" -ge 400 || "$HTTP_CODE" -eq 000 ]]; then
-  echo "❌ ERROR: Failed to create variable group $vg_name"
+  echo "❌ ERROR: Failed to create variable group: $vg_name"
+  echo "🔎 API Response:"
+  cat "$RESPONSE_FILE"
+  # Uncomment the next line if you want to fail fast
+  # exit 1
+  echo "⚠️ Skipping and continuing to next..."
 else
   echo "✅ Variable group $vg_name created successfully!"
 fi
