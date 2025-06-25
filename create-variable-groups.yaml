@@ -43,7 +43,10 @@ EOF
       script: |
         source ./export-vars.sh
 
-        echo "🔁 Environments to process: ${{ join(',', parameters.environments) }}"
+        ENV_LIST="${{ join(',', parameters.environments) }}"
+        IFS=',' read -ra ENV_ARRAY <<< "$ENV_LIST"
+
+        echo "🔁 Environments to process: ${ENV_ARRAY[*]}"
 
         trackname="${track1_name}"
         tracktype="${track1_type}"
@@ -52,7 +55,7 @@ EOF
 
         echo "🧩 Track 1: name=$trackname, type=$tracktype, appid=$appid, apptype=$apptype"
 
-        for env in "${{ parameters.environments[@] }}"; do
+        for env in "${ENV_ARRAY[@]}"; do
           echo "➡️ Creating variable group for $env - $appid - $trackname"
           ./create-multi-env-vgs.sh "$env" "$appid" "$trackname" "$tracktype" "$apptype"
         done
