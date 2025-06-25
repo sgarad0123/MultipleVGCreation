@@ -17,7 +17,7 @@ steps:
   - checkout: self
 
   - task: Bash@3
-    displayName: 'Set execute permission on scripts'
+    displayName: 'Make scripts executable'
     inputs:
       targetType: inline
       script: |
@@ -34,4 +34,18 @@ steps:
       ORG: $(ORG)
       PROJECT: $(PROJECT)
       AZURE_DEVOPS_PAT: $(AZURE_DEVOPS_PAT)
-      # Also exports all vg-create-vg-source values at runtime
+      TRACKCOUNT: $(trackcount)
+
+      # Export Track 1
+      track1_name: $(track1_name)
+      track1_type: $(track1_type)
+      track1_appid: $(track1_appid)
+      track1_apptype: $(track1_apptype)
+
+      # Export Track 2
+      track2_name: $(track2_name)
+      track2_type: $(track2_type)
+      track2_appid: $(track2_appid)
+      track2_apptype: $(track2_apptype)
+
+      # ➕ Add more trackN_* if TRACKCOUNT > 2
