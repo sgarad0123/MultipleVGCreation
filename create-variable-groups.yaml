@@ -11,13 +11,7 @@ variables:
 parameters:
   - name: environments
     type: object
-    default:
-      - DEV
-      - SIT
-      - UAT
-      - PT
-      - PROD
-      - DR
+    default: ['DEV', 'SIT', 'UAT', 'PT', 'PROD', 'DR']
 
 steps:
   - task: Bash@3
@@ -54,21 +48,16 @@ EOF
       script: |
         source ./export-vars.sh
 
-        echo "🔁 Environments to process: ${parameters.environments}"
+        echo "🔁 Environments to process: ${{ parameters.environments }}"
 
         trackname="${track1_name}"
         tracktype="${track1_type}"
         appid="${track1_appid}"
         apptype="${track1_apptype}"
 
-        if [[ -z "$trackname" || -z "$tracktype" || -z "$appid" || -z "$apptype" ]]; then
-          echo "❌ ERROR: Missing input for track1"
-          exit 1
-        fi
-
         echo "🧩 Track 1: name=$trackname, type=$tracktype, appid=$appid, apptype=$apptype"
 
-        for env in DEV SIT UAT PT PROD DR; do
+        for env in "${{ parameters.environments[0] }}" "${{ parameters.environments[1] }}" "${{ parameters.environments[2] }}" "${{ parameters.environments[3] }}" "${{ parameters.environments[4] }}" "${{ parameters.environments[5] }}"; do
           echo "➡️ Creating variable group for $env - $appid - $trackname"
           ./create-multi-env-vgs.sh "$env" "$appid" "$trackname" "$tracktype" "$apptype"
         done
