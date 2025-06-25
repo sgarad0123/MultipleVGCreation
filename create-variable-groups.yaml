@@ -11,7 +11,7 @@ variables:
 parameters:
   - name: environments
     type: object
-    default: ['DEV', 'SIT', 'UAT', 'PT', 'PROD', 'DR'] # Correct way to define default object/array
+    default: ['DEV', 'SIT', 'UAT', 'PT', 'PROD', 'DR']
 
 steps:
   - task: Bash@3
@@ -48,35 +48,13 @@ steps:
       script: |
         source ./export-vars.sh
 
-        # Correctly access the pipeline parameter for environments
-        # Azure DevOps injects object parameters as JSON. We need to parse it.
-        # A common way is to convert the YAML parameter list to a Bash array.
-
-        # Convert the space-separated string from the parameter into a Bash array
-        # This approach assumes the parameter comes as a space-separated string if used directly
-        # If the parameter is an actual YAML array, Azure DevOps often converts it to a
-        # space-separated string when accessed in a Bash script like this.
-        # For robustness, especially with YAML 'object' type parameters, it's safer
-        # to explicitly handle the JSON output.
-
-        # Let's use a more robust way to handle the parameters.environments object,
-        # treating it as a space-separated string from Azure DevOps injection.
-        # This approach is generally safe for simple string arrays like your environments.
-
-        # Convert the parameter object to a string, then parse into a bash array
-        # Azure DevOps typically provides 'object' parameters as a space-separated string in Bash scripts.
-        # So, "${{ parameters.environments }}" might evaluate to "DEV SIT UAT PT PROD DR" directly.
-        # We can then split this string into a bash array.
-
-        # IMPORTANT: Azure DevOps passes `object` parameters as a JSON string to a Bash script.
-        # To handle this robustly, you need to parse the JSON.
-        # However, for simple string arrays like ['DEV', 'SIT', ...], Azure DevOps often
-        # provides it as a space-separated string when you access it directly like below.
-        # If it were a more complex object, you'd need 'jq' to parse JSON.
-
-        # For your simple string array, this is generally sufficient and common practice:
-        ENVIRONMENTS_LIST="${{ parameters.environments }}"
-        IFS=' ' read -r -a environments_array <<< "$ENVIRONMENTS_LIST"
+        # Corrected: Use the 'join' expression to convert the array parameter into a space-separated string
+        # before passing it to Bash.
+        # This is the key change to resolve "Unable to convert from Array to String. Value: Array".
+        environments_str="${{ join(' ', parameters.environments) }}"
+        
+        # Now, split the space-separated string into a Bash array
+        IFS=' ' read -r -a environments_array <<< "$environments_str"
 
         echo "🔁 Environments to process: ${environments_array[@]}"
 
