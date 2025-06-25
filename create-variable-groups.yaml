@@ -22,27 +22,37 @@ steps:
       echo "export PROJECT=\"$(PROJECT)\"" >> export-vars.sh
       echo "export AZURE_DEVOPS_PAT=\"$(AZURE_DEVOPS_PAT)\"" >> export-vars.sh
       echo "export TRACKCOUNT=$(TRACKCOUNT)" >> export-vars.sh
-
       echo "" >> export-vars.sh
       echo "# Dynamically export all trackN_* variables" >> export-vars.sh
 
-      TRACKCOUNT=$(TRACKCOUNT)
-      for i in $(seq 1 $TRACKCOUNT); do
+      COUNT=$(TRACKCOUNT)
+      for i in $(seq 1 $COUNT); do
         name_var="track${i}_name"
         type_var="track${i}_type"
         appid_var="track${i}_appid"
         apptype_var="track${i}_apptype"
 
-        echo "export ${name_var}=\"${!name_var}\"" >> export-vars.sh
-        echo "export ${type_var}=\"${!type_var}\"" >> export-vars.sh
-        echo "export ${appid_var}=\"${!appid_var}\"" >> export-vars.sh
-        echo "export ${apptype_var}=\"${!apptype_var}\"" >> export-vars.sh
+        name_value="${!name_var}"
+        type_value="${!type_var}"
+        appid_value="${!appid_var}"
+        apptype_value="${!apptype_var}"
+
+        if [[ -z "$name_value" || -z "$type_value" || -z "$appid_value" || -z "$apptype_value" ]]; then
+          echo "❌ ERROR: Missing variables for track$i"
+          exit 1
+        fi
+
+        echo "export ${name_var}=\"${name_value}\"" >> export-vars.sh
+        echo "export ${type_var}=\"${type_value}\"" >> export-vars.sh
+        echo "export ${appid_var}=\"${appid_value}\"" >> export-vars.sh
+        echo "export ${apptype_var}=\"${apptype_value}\"" >> export-vars.sh
+        echo "" >> export-vars.sh
       done
 
       chmod +x export-vars.sh
       echo "✅ export-vars.sh created with:"
       cat export-vars.sh
-    displayName: '🔧 Dynamically Generate export-vars.sh'
+    displayName: '🔧 Generate export-vars.sh from vg-create-vg-source'
 
   - script: |
       chmod +x export-vars.sh
@@ -50,4 +60,4 @@ steps:
 
       chmod +x ./process-vg-create-vg-source.sh
       ./process-vg-create-vg-source.sh "${{ join(',', parameters.environments) }}"
-    displayName: '🚀 Create Env-Specific Variable Groups'
+    displayName: '🚀 Process all Env-specific Variable Groups'
