@@ -2,82 +2,97 @@
 
 set -e
 
-ENV="$1"
-APPID="$2"
-TRACKNAME="$3"
-TRACKTYPE="$4"
+env="$1"
+appid="$2"
+trackname="$3"
+tracktype="$4"
 
-if [[ -z "$ENV" || -z "$APPID" || -z "$TRACKNAME" || -z "$TRACKTYPE" ]]; then
+# Validate input
+if [[ -z "$env" || -z "$appid" || -z "$trackname" || -z "$tracktype" ]]; then
   echo "❌ ERROR: Missing input arguments"
+  echo "Usage: ./create-multi-env-vgs.sh <env> <appid> <trackname> <tracktype>"
   exit 1
 fi
 
-ORG="${org:-${ORG}}"
-PROJECT="${project:-${PROJECT}}"
-PAT="${AZURE_DEVOPS_PAT}"
-
-if [[ -z "$ORG" || -z "$PROJECT" || -z "$PAT" ]]; then
+# Validate required variables
+if [[ -z "$ORG" || -z "$PROJECT" || -z "$AZURE_DEVOPS_PAT" ]]; then
   echo "❌ ERROR: Missing org, project or PAT env variables"
   exit 1
 fi
 
-ENCODED_PAT=$(printf ":%s" "$PAT" | base64 | tr -d '\n')
+# Encode PAT
+ENCODED_PAT=$(printf ":%s" "$AZURE_DEVOPS_PAT" | base64 | tr -d '\n')
 AUTH_HEADER="Authorization: Basic $ENCODED_PAT"
 
-# Project ID
-PROJECT_API_URL="https://dev.azure.com/$ORG/_apis/projects/$PROJECT?api-version=7.1-preview.1"
-PROJECT_ID=$(curl -s -H "$AUTH_HEADER" "$PROJECT_API_URL" | jq -r '.id')
+# Get project ID
+PROJECT_ID=$(curl -s -H "$AUTH_HEADER" \
+  "https://dev.azure.com/$ORG/_apis/projects/$PROJECT?api-version=7.1-preview.1" | jq -r '.id')
 
-VG_NAME="${ENV}-${APPID}-${TRACKNAME}-VG"
+if [[ "$PROJECT_ID" == "null" || -z "$PROJECT_ID" ]]; then
+  echo "❌ ERROR: Failed to fetch project ID for $PROJECT"
+  exit 1
+fi
 
-# sys-AppCriticality
-case "$TRACKTYPE" in
-  web)    CRIT="bcweb" ;;
-  chatbot)
-    if [[ "$ENV" =~ ^(PROD|DR)$ ]]; then
-      CRIT="chatbotweb"
-    else
-      CRIT="devintweb-chatbot"
-    fi
-    ;;
-  *)      CRIT="bcapi" ;;
-esac
+# Lowercase values
+trackname_lc=$(echo "$trackname" | tr '[:upper:]' '[:lower:]')
+tracktype_lc=$(echo "$tracktype" | tr '[:upper:]' '[:lower:]')
+env_lc=$(echo "$env" | tr '[:upper:]' '[:lower:]')
 
-# sys-Namespace
-case "$TRACKTYPE" in
-  web)
-    if [[ "$ENV" =~ ^(PROD|DR)$ ]]; then NS="bcweb"
-    else NS="$(echo "$ENV" | awk '{print tolower($0)}')web-bc"; fi
-    ;;
-  chatbot)
-    if [[ "$ENV" =~ ^(PROD|DR)$ ]]; then NS="chatbotweb"
-    else NS="$(echo "$ENV" | awk '{print tolower($0)}')web-chatbot"; fi
-    ;;
-  *)
-    if [[ "$ENV" =~ ^(PROD|DR)$ ]]; then NS="bcapi"
-    else NS="$(echo "$ENV" | awk '{print tolower($0)}')api-bc"; fi
-    ;;
-esac
+# Determine sys-AppCriticality
+if [[ "$tracktype_lc" == "web" ]]; then
+  appCriticality="bcweb"
+elif [[ "$tracktype_lc" == "chatbot" ]]; then
+  appCriticality="chatbotweb"
+else
+  appCriticality="bcapi"
+fi
 
-# sys-SecretResourceName
-SECRET_NAME="$(echo "${ENV}-${APPID}-${TRACKTYPE}-${TRACKNAME}-secret" | tr '[:upper:]' '[:lower:]')"
+# Determine sys-Namespace
+if [[ "$env" == "PROD" || "$env" == "DR" ]]; then
+  namespace="$appCriticality"
+else
+  if [[ "$tracktype_lc" == "web" ]]; then
+    namespace="${env_lc}intweb-bc"
+  elif [[ "$tracktype_lc" == "chatbot" ]]; then
+    namespace="${env_lc}intweb-chatbot"
+  else
+    namespace="${env_lc}intapi-bc"
+  fi
+fi
 
-# sys-ImagePath
-IMAGE_PATH="\$(ACRPath-NonProd)/\$(appid(${APPID})-${TRACKNAME}-ACRRepositoryName)"
+# Construct variable group name
+vg_name="${env}-${appid}-${trackname}-VG"
 
-# Build payload
-cat > variables.json <<EOF
-{
-  "MSI-Identitybinding": { "value": "default", "isSecret": false },
-  "sys-AppCriticality": { "value": "${CRIT}", "isSecret": false },
-  "sys-Namespace": { "value": "${NS}", "isSecret": false },
-  "sys-SecretResourceName": { "value": "${SECRET_NAME}", "isSecret": false },
-  "sys-ImagePath": { "value": "${IMAGE_PATH}", "isSecret": false }
-}
-EOF
+# Construct image path
+imagePath="\$(ACRPath-NonProd)/\$(${appid}-${trackname}-ACRRepositoryName)"
 
+# Construct secret resource name (lowercase)
+secretName=$(echo "${env}-${appid}-${tracktype}-${trackname}-secret" | tr '[:upper:]' '[:lower:]')
+
+# Always include MSI-Identitybinding
+declare -A variables=(
+  ["MSI-Identitybinding"]="default"
+  ["sys-AppCriticality"]="$appCriticality"
+  ["sys-Namespace"]="$namespace"
+  ["sys-ImagePath"]="$imagePath"
+  ["sys-SecretResourceName"]="$secretName"
+)
+
+# Create JSON
+VARIABLES_JSON="{"
+i=0
+for key in "${!variables[@]}"; do
+  VARIABLES_JSON+="\"$key\": { \"value\": \"${variables[$key]}\", \"isSecret\": false }"
+  [[ $i -lt $((${#variables[@]} - 1)) ]] && VARIABLES_JSON+=","
+  ((i++))
+done
+VARIABLES_JSON+="}"
+
+echo "$VARIABLES_JSON" > variables.json
+
+# Prepare payload
 BODY=$(jq -n \
-  --arg name "$VG_NAME" \
+  --arg name "$vg_name" \
   --arg projectId "$PROJECT_ID" \
   --arg projectName "$PROJECT" \
   --slurpfile variables variables.json \
@@ -96,18 +111,20 @@ BODY=$(jq -n \
     ]
   }')
 
+# Send request
 URL="https://dev.azure.com/$ORG/$PROJECT/_apis/distributedtask/variablegroups?api-version=7.1-preview.2"
 RESPONSE_FILE=$(mktemp)
 
-echo "📦 Creating variable group: $VG_NAME"
 HTTP_CODE=$(curl --http1.1 -s -w "%{http_code}" -o "$RESPONSE_FILE" -X POST \
   -H "$AUTH_HEADER" \
   -H "Content-Type: application/json" \
   -d "$BODY" "$URL")
 
+echo "📡 Response Code: $HTTP_CODE"
+cat "$RESPONSE_FILE"
+
 if [[ "$HTTP_CODE" -ge 400 || "$HTTP_CODE" -eq 000 ]]; then
-  echo "❌ Failed to create variable group $VG_NAME"
-  cat "$RESPONSE_FILE"
+  echo "❌ ERROR: Failed to create variable group $vg_name"
 else
-  echo "✅ Successfully created variable group: $VG_NAME"
+  echo "✅ Variable group $vg_name created successfully!"
 fi
