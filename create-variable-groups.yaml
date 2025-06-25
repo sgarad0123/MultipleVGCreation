@@ -14,46 +14,27 @@ variables:
   - group: devops-secrets-vg
 
 steps:
-  - checkout: self
+  - script: |
+      echo "🔧 Generating export-vars.sh..."
+      echo "#!/bin/bash" > export-vars.sh
+      echo "export ORG=\"$(ORG)\"" >> export-vars.sh
+      echo "export PROJECT=\"$(PROJECT)\"" >> export-vars.sh
+      echo "export AZURE_DEVOPS_PAT=\"$(AZURE_DEVOPS_PAT)\"" >> export-vars.sh
+      echo "export TRACKCOUNT=$(TRACKCOUNT)" >> export-vars.sh
 
-  - task: Bash@3
-    displayName: 'Make scripts executable'
-    inputs:
-      targetType: inline
-      script: |
-        chmod +x ./process-vg-create-vg-source.sh
-        chmod +x ./create-multi-env-vgs.sh
+      for ((i=1;i<=$(TRACKCOUNT);i++)); do
+        echo "export track${i}_name=\"$(eval echo \$\(track${i}_name\))\"" >> export-vars.sh
+        echo "export track${i}_type=\"$(eval echo \$\(track${i}_type\))\"" >> export-vars.sh
+        echo "export track${i}_appid=\"$(eval echo \$\(track${i}_appid\))\"" >> export-vars.sh
+        echo "export track${i}_apptype=\"$(eval echo \$\(track${i}_apptype\))\"" >> export-vars.sh
+      done
 
-  - task: Bash@3
-    displayName: 'Generate export-vars.sh from pipeline variables'
-    name: exportTrackVars
-    inputs:
-      targetType: inline
-      script: |
-        echo "📦 Generating export-vars.sh from defined variables"
-        > export-vars.sh
+      chmod +x export-vars.sh
+      echo "✅ export-vars.sh created with:"
+      cat export-vars.sh
+    displayName: '🔧 Generate export-vars.sh'
 
-        for i in $(seq 1 50); do
-          for key in name type appid apptype; do
-            varName="track${i}_${key}"
-            value="$(eval echo "\$$varName")"
-            if [[ -n "$value" ]]; then
-              echo "export $varName=\"$value\"" >> export-vars.sh
-            fi
-          done
-        done
-
-        echo "export TRACKCOUNT=$(TRACKCOUNT)" >> export-vars.sh
-        echo "✅ Contents of export-vars.sh:"
-        cat export-vars.sh
-
-  - task: Bash@3
-    displayName: 'Run Multi-Env Variable Group Creation'
-    inputs:
-      targetType: filePath
-      filePath: ./process-vg-create-vg-source.sh
-      arguments: ${{ join(',', parameters.environments) }}
-    env:
-      ORG: $(ORG)
-      PROJECT: $(PROJECT)
-      AZURE_DEVOPS_PAT: $(AZURE_DEVOPS_PAT)
+  - script: |
+      chmod +x ./process-vg-create-vg-source.sh
+      ./process-vg-create-vg-source.sh "${{ join(',', parameters.environments) }}"
+    displayName: '🚀 Create Env-specific Variable Groups'
