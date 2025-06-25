@@ -16,13 +16,13 @@ variables:
 steps:
   - script: |
       echo "🔧 Generating export-vars.sh..."
-      echo "#!/bin/bash" > export-vars.sh
+      echo '#!/bin/bash' > export-vars.sh
+
       echo "export ORG=\"$(ORG)\"" >> export-vars.sh
       echo "export PROJECT=\"$(PROJECT)\"" >> export-vars.sh
       echo "export AZURE_DEVOPS_PAT=\"$(AZURE_DEVOPS_PAT)\"" >> export-vars.sh
       echo "export TRACKCOUNT=$(TRACKCOUNT)" >> export-vars.sh
 
-      # Manually inject known max (e.g., 10) but leave unused ones empty
       for i in {1..10}; do
         echo "export track${i}_name=\"$(eval echo \${{ variables['track${i}_name'] }})\"" >> export-vars.sh
         echo "export track${i}_type=\"$(eval echo \${{ variables['track${i}_type'] }})\"" >> export-vars.sh
