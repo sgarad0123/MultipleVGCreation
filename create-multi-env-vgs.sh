@@ -6,14 +6,14 @@ ENV="$1"
 APPID="$2"
 TRACKNAME="$3"
 TRACKTYPE="$4"
+APPTYPE="$5"
 
-if [[ -z "$ENV" || -z "$APPID" || -z "$TRACKNAME" || -z "$TRACKTYPE" ]]; then
+if [[ -z "$ENV" || -z "$APPID" || -z "$TRACKNAME" || -z "$TRACKTYPE" || -z "$APPTYPE" ]]; then
   echo "❌ ERROR: Missing input arguments"
-  echo "Usage: ./create-multi-env-vgs.sh <ENV> <APPID> <TRACKNAME> <TRACKTYPE>"
+  echo "Usage: ./create-multi-env-vgs.sh <ENV> <APPID> <TRACKNAME> <TRACKTYPE> <APPTYPE>"
   exit 1
 fi
 
-# Env variables expected to be passed or exported
 ORG="${org:-${ORG}}"
 PROJECT="${project:-${PROJECT}}"
 PAT="${AZURE_DEVOPS_PAT}"
@@ -27,62 +27,70 @@ ENCODED_PAT=$(printf ":%s" "$PAT" | base64 | tr -d '\n')
 AUTH_HEADER="Authorization: Basic $ENCODED_PAT"
 
 # Get Project ID
-PROJECT_API_URL="https://dev.azure.com/$ORG/_apis/projects/$PROJECT?api-version=7.1-preview.1"
-PROJECT_ID=$(curl -s -H "$AUTH_HEADER" "$PROJECT_API_URL" | jq -r '.id')
+PROJECT_ID=$(curl -s -H "$AUTH_HEADER" \
+  "https://dev.azure.com/$ORG/_apis/projects/$PROJECT?api-version=7.1-preview.1" | jq -r '.id')
 
-if [[ -z "$PROJECT_ID" || "$PROJECT_ID" == "null" ]]; then
+if [[ "$PROJECT_ID" == "null" || -z "$PROJECT_ID" ]]; then
   echo "❌ ERROR: Failed to fetch project ID"
   exit 1
 fi
 
 VG_NAME="${ENV}-${APPID}-${TRACKNAME}-VG"
+VG_CHECK_URL="https://dev.azure.com/$ORG/$PROJECT/_apis/distributedtask/variablegroups?groupName=$VG_NAME&api-version=7.1-preview.2"
+VG_EXISTS=$(curl -s -H "$AUTH_HEADER" "$VG_CHECK_URL" | jq -r '.value | length')
 
-# Skip if VG already exists
-CHECK_VG_URL="https://dev.azure.com/$ORG/$PROJECT/_apis/distributedtask/variablegroups?groupName=$VG_NAME&api-version=7.1-preview.2"
-EXISTS=$(curl -s -H "$AUTH_HEADER" "$CHECK_VG_URL" | jq -r '.value | length')
-
-if [[ "$EXISTS" -gt 0 ]]; then
-  echo "✅ Variable group $VG_NAME already exists. Skipping creation."
+if [[ "$VG_EXISTS" -gt 0 ]]; then
+  echo "✅ Variable group $VG_NAME already exists. Skipping..."
   exit 0
 fi
 
-# Lowercase ENV
-ENV_LC=$(echo "$ENV" | awk '{print tolower($0)}')
-TRACKTYPE_LC=$(echo "$TRACKTYPE" | awk '{print tolower($0)}')
-TRACKNAME_LC=$(echo "$TRACKNAME" | awk '{print tolower($0)}')
+# Normalize input
+ENV_LC=$(echo "$ENV" | tr '[:upper:]' '[:lower:]')
+TRACKTYPE_LC=$(echo "$TRACKTYPE" | tr '[:upper:]' '[:lower:]')
+APPTYPE_LC=$(echo "$APPTYPE" | tr '[:upper:]' '[:lower:]')
+TRACKNAME_LC=$(echo "$TRACKNAME" | tr '[:upper:]' '[:lower:]')
 
-# AppCriticality
-if [[ "$TRACKTYPE_LC" == "web" ]]; then
-  APP_CRITICALITY="bcweb"
-elif [[ "$TRACKTYPE_LC" == "chatbot" ]]; then
-  if [[ "$ENV" == "PROD" || "$ENV" == "DR" ]]; then
-    APP_CRITICALITY="chatbotweb"
-  else
-    APP_CRITICALITY="chatbotweb"
-  fi
+# sys-AppCriticality
+case "$APPTYPE_LC" in
+  chatbot)            APP_CRITICALITY="chatbot" ;;
+  wa)                 APP_CRITICALITY="bcweb" ;;
+  contractautweb)     APP_CRITICALITY="contractauthweb" ;;
+  contractautapi)     APP_CRITICALITY="contractauthapi" ;;
+  api|func|bj)        APP_CRITICALITY="bcapi" ;;
+  *)                  APP_CRITICALITY="bcapi" ;;
+esac
+
+# sys-Namespace
+if [[ "$ENV" == "DEV" ]]; then
+  NAMESPACE="${ENV_LC}intapi-bc"
 else
-  APP_CRITICALITY="bcapi"
+  if [[ "$APPTYPE_LC" == "chatbot" && "$TRACKTYPE_LC" == "wa" ]]; then
+    case "$ENV" in
+      PROD|DR) NAMESPACE="chatbotweb" ;;
+      *)       NAMESPACE="${ENV_LC}web-bc" ;;
+    esac
+  elif [[ "$APPTYPE_LC" == "chatbot" ]]; then
+    case "$ENV" in
+      PROD|DR) NAMESPACE="chatbotweb" ;;
+      *)       NAMESPACE="${ENV_LC}web-chatbot" ;;
+    esac
+  elif [[ "$APPTYPE_LC" == "wa" ]]; then
+    NAMESPACE="${ENV_LC}web-bc"
+  else
+    case "$ENV" in
+      PROD|DR) NAMESPACE="bcapi" ;;
+      *)       NAMESPACE="${ENV_LC}api-bc" ;;
+    esac
+  fi
 fi
 
-# Namespace
-if [[ "$ENV" == "PROD" || "$ENV" == "DR" ]]; then
-  NAMESPACE="$APP_CRITICALITY"
-else
-  if [[ "$TRACKTYPE_LC" == "web" ]]; then
-    NAMESPACE="${ENV_LC}intweb-bc"
-  elif [[ "$TRACKTYPE_LC" == "chatbot" ]]; then
-    NAMESPACE="${ENV_LC}intweb-chatbot"
-  else
-    NAMESPACE="${ENV_LC}intapi-bc"
-  fi
-fi
+# sys-SecretResourceName
+SECRET_NAME=$(echo "${ENV}-${APPID}-${TRACKTYPE}-${TRACKNAME}-secret" | tr '[:upper:]' '[:lower:]')
 
-# Secret name and image path
-SECRET_NAME="${ENV}-${APPID}-${TRACKTYPE}-${TRACKNAME}-secret"
-SECRET_NAME=$(echo "$SECRET_NAME" | tr '[:upper:]' '[:lower:]')
+# sys-ImagePath
 IMAGE_PATH="\$(ACRPath-NonProd)/\$(${APPID}-${TRACKNAME}-ACRRepositoryName)"
 
-# Build variable group values
+# Write variable data
 cat > variables.json <<EOF
 {
   "MSI-Identitybinding": { "value": "default", "isSecret": false },
@@ -117,10 +125,10 @@ URL="https://dev.azure.com/$ORG/$PROJECT/_apis/distributedtask/variablegroups?ap
 RESPONSE_FILE=$(mktemp)
 
 echo "📦 Creating variable group: $VG_NAME"
-echo "📌 AppCriticality: $APP_CRITICALITY"
-echo "📌 Namespace: $NAMESPACE"
-echo "📌 Secret: $SECRET_NAME"
-echo "📌 Image Path: $IMAGE_PATH"
+echo "🔹 AppCriticality: $APP_CRITICALITY"
+echo "🔹 Namespace: $NAMESPACE"
+echo "🔹 Secret Name: $SECRET_NAME"
+echo "🔹 Image Path: $IMAGE_PATH"
 
 HTTP_CODE=$(curl --http1.1 -s -w "%{http_code}" -o "$RESPONSE_FILE" -X POST \
   -H "$AUTH_HEADER" \
@@ -128,7 +136,7 @@ HTTP_CODE=$(curl --http1.1 -s -w "%{http_code}" -o "$RESPONSE_FILE" -X POST \
   -d "$BODY" "$URL")
 
 if [[ "$HTTP_CODE" -ge 400 || "$HTTP_CODE" -eq 000 ]]; then
-  echo "❌ ERROR: Failed to create variable group $VG_NAME"
+  echo "❌ ERROR: Failed to create variable group: $VG_NAME"
   cat "$RESPONSE_FILE"
 else
   echo "✅ Successfully created variable group: $VG_NAME"
