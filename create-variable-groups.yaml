@@ -20,7 +20,10 @@ steps:
       echo "🔁 Environments to process:"
       environments="${{ join(',', parameters.environments) }}"
       IFS=',' read -ra ENV_LIST <<< "$environments"
-
+      # Export Azure DevOps variables to Bash
+      export ORG="$(ORG)"
+      export PROJECT="$(PROJECT)"
+      export AZURE_DEVOPS_PAT="$(AZURE_DEVOPS_PAT)"
       # Manually export all track variables
       export TRACKCOUNT=$(echo "$(TRACKCOUNT)")
       export track1_name="$(track1_name)"
