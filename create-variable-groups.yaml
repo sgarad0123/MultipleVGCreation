@@ -5,7 +5,8 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  - group: vg-create-vg-source  # Make sure this group has values defined
+  - group: vg-create-vg-source
+  - group: devops-secrets-vg 
 
 parameters:
   - name: environments
@@ -32,7 +33,7 @@ EOF
   - script: |
       source ./export-vars.sh
 
-      echo "🔁 Environments to process: ${parameters.environments[*]}"
+      echo "🔁 Environments to process: ${{ join(',', parameters.environments) }}"
 
       trackname="$track1_name"
       tracktype="$track1_type"
@@ -41,7 +42,7 @@ EOF
 
       echo "🧩 Track 1: name=$trackname, type=$tracktype, appid=$appid, apptype=$apptype"
 
-      for env in ${parameters.environments[*]}; do
+      for env in "${{ parameters.environments[*] }}"; do
         echo "➡️ Creating variable group for $env - $appid - $trackname"
         ./create-multi-env-vgs.sh "$env" "$appid" "$trackname" "$tracktype" "$apptype"
       done
