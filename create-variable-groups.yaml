@@ -15,12 +15,12 @@ parameters:
 
 steps:
   # Task 1: Install jq and set permissions
-  - task: Bash@3 # Indent 2 spaces from 'steps:'
-    displayName: "⚙️ Install jq and set permissions" # Indent 4 spaces from '- task:'
-    inputs: # Indent 4 spaces from '- task:'
-      targetType: 'inline' # Indent 6 spaces from 'inputs:'
-      script: | # Indent 6 spaces from 'inputs:'
-        # All lines of the script must be indented 2 spaces further than 'script: |'
+  - task: Bash@3 # 2 spaces indent
+    displayName: "⚙️ Install jq and set permissions" # 4 spaces indent
+    inputs: # 4 spaces indent
+      targetType: 'inline' # 6 spaces indent
+      script: | # 6 spaces indent
+        # All lines of the script content must be indented 2 spaces further than 'script: |' (i.e., 8 spaces total)
         echo "Installing jq for JSON processing..."
         sudo apt-get update && sudo apt-get install -y jq
         echo "jq installed."
@@ -30,22 +30,22 @@ steps:
         echo "Permissions set."
 
   # Task 2: Create Variable Groups
-  - task: Bash@3 # Indent 2 spaces from 'steps:'
-    displayName: "🚀 Create Variable Groups" # Indent 4 spaces from '- task:'
-    inputs: # Indent 4 spaces from '- task:'
-      targetType: 'inline' # Indent 6 spaces from 'inputs:'
-      # THIS IS THE CRITICAL SECTION FOR YOUR ERROR.
-      # Ensure 'env:' is at the *exact same* indentation level as 'targetType:' and 'script:'
-      env: # <--- Make sure 'env:' is indented 6 spaces from 'inputs:'
-        ORG: $(ORG) # Indent 8 spaces from 'env:'
-        PROJECT: $(PROJECT) # Indent 8 spaces from 'env:'
-        AZURE_DEVOPS_PAT: $(AZURE_DEVOPS_PAT) # Indent 8 spaces from 'env:'
-        TRACK1_NAME: $(track1_name) # Indent 8 spaces from 'env:'
-        TRACK1_TYPE: $(track1_type) # Indent 8 spaces from 'env:'
-        TRACK1_APPID: $(track1_appid) # Indent 8 spaces from 'env:'
-        TRACK1_APPTYPE: $(track1_apptype) # Indent 8 spaces from 'env:'
-      script: | # Indent 6 spaces from 'inputs:'
-        # All lines of the script must be indented 2 spaces further than 'script: |'
+  - task: Bash@3 # 2 spaces indent
+    displayName: "🚀 Create Variable Groups" # 4 spaces indent
+    inputs: # 4 spaces indent
+      targetType: 'inline' # 6 spaces indent
+      # THIS IS THE LINE (OR AROUND IT) THAT IS CAUSING YOUR ERROR.
+      # Ensure 'env:' is AT THE SAME INDENTATION LEVEL (6 spaces) as 'targetType:' and 'script:'
+      env: # <-- LINE 40 (approximately). MUST have exactly 6 spaces before 'env:'.
+        ORG: $(ORG) # 8 spaces indent
+        PROJECT: $(PROJECT) # 8 spaces indent
+        AZURE_DEVOPS_PAT: $(AZURE_DEVOPS_PAT) # 8 spaces indent
+        TRACK1_NAME: $(track1_name) # 8 spaces indent
+        TRACK1_TYPE: $(track1_type) # 8 spaces indent
+        TRACK1_APPID: $(track1_appid) # 8 spaces indent
+        TRACK1_APPTYPE: $(track1_apptype) # 8 spaces indent
+      script: | # 6 spaces indent
+        # All lines of the script content must be indented 2 spaces further than 'script: |' (i.e., 8 spaces total)
         echo "Starting Variable Group Creation process..."
 
         ORG="${ORG}"
@@ -63,7 +63,7 @@ steps:
           exit 1
         fi
 
-        echo "🧩 Track 1 details: name=$trackname, type=$tracktype, appid=$appid, apptype=$apptype"
+        echo "🧩 Track 1 details: name=$trackname, type=$tracktype, appid=$appid, apptype=$aptype"
         echo "Azure DevOps Org: $ORG, Project: $PROJECT"
 
         environments_str="${{ join(' ', parameters.environments) }}"
