@@ -1,24 +1,18 @@
 #!/bin/bash
-set -e
 
-echo '#!/bin/bash' > export-vars.sh
-echo "export ORG=\"${ORG}\"" >> export-vars.sh
-echo "export PROJECT=\"${PROJECT}\"" >> export-vars.sh
-echo "export AZURE_DEVOPS_PAT=\"${AZURE_DEVOPS_PAT}\"" >> export-vars.sh
-echo "export TRACKCOUNT=${TRACKCOUNT}" >> export-vars.sh
-echo "" >> export-vars.sh
+echo "🔧 Generating export-vars.sh..."
 
-for ((i=1; i<=${TRACKCOUNT}; i++)); do
-  for var in name type appid apptype; do
-    varname="track${i}_${var}"
-    value=$(eval echo \$$varname)
-    if [[ -z "$value" ]]; then
-      echo "❌ ERROR: Missing variables for track${i} ($var)"
-      exit 1
-    fi
-    echo "export $varname=\"$value\"" >> export-vars.sh
-  done
-done
+cat > export-vars.sh <<EOF
+#!/bin/bash
+export ORG="${ORG}"
+export PROJECT="${PROJECT}"
+export AZURE_DEVOPS_PAT="${AZURE_DEVOPS_PAT}"
+export TRACKCOUNT=1
+export track1_name="${track1_name}"
+export track1_type="${track1_type}"
+export track1_appid="${track1_appid}"
+export track1_apptype="${track1_apptype}"
+EOF
 
-echo "✅ export-vars.sh created with:"
-cat export-vars.sh
+chmod +x export-vars.sh
+echo "✅ export-vars.sh created"
