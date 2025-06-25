@@ -15,28 +15,46 @@ variables:
 
 steps:
   - script: |
+      echo "TRACKCOUNT: $(TRACKCOUNT)"
+      echo "track1_name: $(track1_name)"
+      echo "track1_type: $(track1_type)"
+      echo "track1_appid: $(track1_appid)"
+      echo "track1_apptype: $(track1_apptype)"
+    displayName: '🔍 Debug Track 1 Inputs'
+
+  - script: |
       chmod +x ./generate-export-vars.sh
       ./generate-export-vars.sh
-    displayName: '🔧 Generate dynamic export-vars.sh'
+    displayName: '🔧 Generate export-vars.sh'
 
   - script: |
       source ./export-vars.sh
+      chmod +x ./create-multi-env-vgs.sh
 
       echo "🔁 Environments to process: ${{ join(',', parameters.environments) }}"
-
       IFS=',' read -ra ENV_LIST <<< "${{ join(',', parameters.environments) }}"
 
-      for ((i=1; i<=TRACKCOUNT; i++)); do
-        trackname=$(eval echo "\$track${i}_name")
-        tracktype=$(eval echo "\$track${i}_type")
-        appid=$(eval echo "\$track${i}_appid")
-        apptype=$(eval echo "\$track${i}_apptype")
+      for ((i=1; i<=${TRACKCOUNT}; i++)); do
+        name_var="track${i}_name"
+        type_var="track${i}_type"
+        appid_var="track${i}_appid"
+        apptype_var="track${i}_apptype"
 
-        echo "🧩 Track $i: name=$trackname, type=$tracktype, appid=$appid, apptype=$apptype"
+        TRACKNAME="${!name_var}"
+        TRACKTYPE="${!type_var}"
+        APPID="${!appid_var}"
+        APPTYPE="${!apptype_var}"
 
-        for env in "${ENV_LIST[@]}"; do
-          echo "➡️ Creating variable group for $env - $appid - $trackname"
-          ./create-multi-env-vgs.sh "$env" "$appid" "$trackname" "$tracktype" "$apptype"
+        if [[ -z "$TRACKNAME" || -z "$TRACKTYPE" || -z "$APPID" || -z "$APPTYPE" ]]; then
+          echo "❌ ERROR: Missing variables for track$i"
+          exit 1
+        fi
+
+        echo "🧩 Track $i: name=$TRACKNAME, type=$TRACKTYPE, appid=$APPID, apptype=$APPTYPE"
+
+        for ENV in "${ENV_LIST[@]}"; do
+          echo "➡️ Creating variable group for $ENV - $APPID - $TRACKNAME"
+          ./create-multi-env-vgs.sh "$ENV" "$APPID" "$TRACKNAME" "$TRACKTYPE" "$APPTYPE"
         done
       done
-    displayName: '🚀 Create Env-specific Variable Groups from Tracks'
+    displayName: '🚀 Create Variable Groups for All Envs'
