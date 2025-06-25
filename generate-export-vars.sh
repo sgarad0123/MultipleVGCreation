@@ -1,5 +1,4 @@
 #!/bin/bash
-
 set -e
 
 echo '#!/bin/bash' > export-vars.sh
