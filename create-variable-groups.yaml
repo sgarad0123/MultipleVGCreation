@@ -1,0 +1,36 @@
+trigger: none
+
+parameters:
+  - name: environments
+    type: object
+    default: ['DEV', 'SIT', 'UAT', 'PT', 'PROD', 'DR']
+  - name: trackList
+    type: object
+    default:
+      - { trackname: 'orders', tracktype: 'web', appid: '343' }
+      - { trackname: 'support', tracktype: 'chatbot', appid: '343' }
+
+pool:
+  name: AKS
+  vmImage: 'ubuntu-latest
+
+variables:
+  - group: vg-create-vg-source
+  - group: devops-secrets-vg 
+
+steps:
+  - script: |
+      chmod +x ./create-multi-env-vgs.sh
+
+      for env in ${{ parameters.environments }}; do
+        for track in "${{ convertToJson(parameters.trackList) }}" ; do
+          echo "$track" > track.json
+          trackname=$(jq -r .trackname track.json)
+          tracktype=$(jq -r .tracktype track.json)
+          appid=$(jq -r .appid track.json)
+
+          echo "➡️ Creating variable group for $env - $appid - $trackname"
+          ./create-multi-env-vgs.sh "$env" "$appid" "$trackname" "$tracktype"
+        done
+      done
+    displayName: 'Create Variable Groups Per Environment'
