@@ -3,19 +3,18 @@ set -e
 
 PARAM_ENVIRONMENTS="$1"
 
+# Load all trackN_* variables
 if [[ ! -f ./export-vars.sh ]]; then
-  echo "❌ export-vars.sh not found! Did export step fail?"
+  echo "❌ ERROR: export-vars.sh not found"
   exit 1
 fi
-
-# 🔁 Load exported track variables dynamically
 source ./export-vars.sh
 
 echo "🔁 Environments to process: $PARAM_ENVIRONMENTS"
 IFS=',' read -ra ENV_LIST <<< "$PARAM_ENVIRONMENTS"
 
 if [[ -z "$TRACKCOUNT" ]]; then
-  echo "❌ ERROR: 'trackcount' not defined"
+  echo "❌ ERROR: TRACKCOUNT is not defined"
   exit 1
 fi
 
