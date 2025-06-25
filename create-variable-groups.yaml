@@ -11,7 +11,13 @@ variables:
 parameters:
   - name: environments
     type: object
-    default: ['DEV', 'SIT', 'UAT', 'PT', 'PROD', 'DR']
+    default:
+      - DEV
+      - SIT
+      - UAT
+      - PT
+      - PROD
+      - DR
 
 steps:
   - task: Bash@3
