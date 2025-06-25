@@ -1,11 +1,21 @@
 #!/bin/bash
 set -e
 
+PARAM_ENVIRONMENTS="$1"
+
+if [[ ! -f ./export-vars.sh ]]; then
+  echo "❌ export-vars.sh not found! Did export step fail?"
+  exit 1
+fi
+
+# 🔁 Load exported track variables dynamically
+source ./export-vars.sh
+
 echo "🔁 Environments to process: $PARAM_ENVIRONMENTS"
 IFS=',' read -ra ENV_LIST <<< "$PARAM_ENVIRONMENTS"
 
 if [[ -z "$TRACKCOUNT" ]]; then
-  echo "❌ ERROR: 'trackcount' not defined in vg-create-vg-source"
+  echo "❌ ERROR: 'trackcount' not defined"
   exit 1
 fi
 
@@ -18,7 +28,7 @@ for ((i=1; i<=TRACKCOUNT; i++)); do
   apptype=$(eval echo "\$track${i}_apptype")
 
   if [[ -z "$trackname" || -z "$tracktype" || -z "$appid" || -z "$apptype" ]]; then
-    echo "❌ ERROR: Missing track variables for track$i"
+    echo "❌ ERROR: Missing variables for track$i"
     continue
   fi
 
