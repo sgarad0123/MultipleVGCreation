@@ -14,30 +14,10 @@ variables:
   - group: devops-secrets-vg
 
 steps:
-
   - script: |
       echo "🔧 Generating export-vars.sh..."
-      echo '#!/bin/bash' > export-vars.sh
-      echo "export ORG=\"$(ORG)\"" >> export-vars.sh
-      echo "export PROJECT=\"$(PROJECT)\"" >> export-vars.sh
-      echo "export AZURE_DEVOPS_PAT=\"$(AZURE_DEVOPS_PAT)\"" >> export-vars.sh
-      echo "export TRACKCOUNT=$(TRACKCOUNT)" >> export-vars.sh
-      echo "" >> export-vars.sh
-
-      for ((i=1; i<=${TRACKCOUNT}; i++)); do
-        for var in name type appid apptype; do
-          varname="track${i}_${var}"
-          value="$(eval echo "\${{ variables[$varname] }}")"
-          if [[ -z "$value" ]]; then
-            echo "❌ ERROR: Missing variables for track${i} ($var)"
-            exit 1
-          fi
-          echo "export $varname=\"$value\"" >> export-vars.sh
-        done
-      done
-
-      echo "✅ export-vars.sh created with:"
-      cat export-vars.sh
+      chmod +x generate-export-vars.sh
+      ./generate-export-vars.sh
     displayName: "🔧 Generate export-vars.sh"
 
   - script: |
@@ -45,6 +25,7 @@ steps:
       source ./export-vars.sh
 
       echo "🔁 Environments to process: ${{ join(',', parameters.environments) }}"
+
       for ((i=1; i<=${TRACKCOUNT}; i++)); do
         trackname=$(eval echo "\$track${i}_name")
         tracktype=$(eval echo "\$track${i}_type")
