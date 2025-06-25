@@ -34,8 +34,7 @@ steps:
     displayName: "🚀 Create Variable Groups"
     inputs:
       targetType: 'inline'
-      # Explicitly pass required variables as environment variables to this task
-      # This ensures they are available within the script's scope
+      # CORRECTED INDENTATION: 'env' should be at the same level as 'targetType' and 'script'
       env:
         ORG: $(ORG)
         PROJECT: $(PROJECT)
