@@ -24,7 +24,7 @@ steps:
       chmod +x ./export-vars.sh
       source ./export-vars.sh
 
-      echo "🔁 Environments to process: ${{ join(',', parameters.environments) }}"
+      echo "🔁 Environments to process: ${parameters.environments[*]}"
 
       for ((i=1; i<=${TRACKCOUNT}; i++)); do
         trackname=$(eval echo "\$track${i}_name")
@@ -34,7 +34,7 @@ steps:
 
         echo "🧩 Track $i: name=$trackname, type=$tracktype, appid=$appid, apptype=$apptype"
 
-        for env in "${{ parameters.environments[@] }}"; do
+        for env in ${parameters.environments[*]}; do
           echo "➡️ Creating variable group for $env - $appid - $trackname"
           ./create-multi-env-vgs.sh "$env" "$appid" "$trackname" "$tracktype" "$apptype"
         done
