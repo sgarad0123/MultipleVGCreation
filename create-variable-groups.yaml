@@ -11,18 +11,25 @@ pool:
 
 variables:
   - group: vg-create-vg-source
-  - group: devops-secrets-vg 
+  - group: devops-secrets-vg
 
 steps:
   - script: |
       chmod +x ./create-multi-env-vgs.sh
+
+      echo "🔁 Environments to process:"
+
+      environments="${{ join(',', parameters.environments) }}"
+      IFS=',' read -ra ENV_LIST <<< "$environments"
+
+      echo "Found TRACKCOUNT=$TRACKCOUNT from variable group"
 
       for ((i=1; i<=${TRACKCOUNT}; i++)); do
         trackname=$(eval echo "\$track${i}_name")
         tracktype=$(eval echo "\$track${i}_type")
         appid=$(eval echo "\$track${i}_appid")
 
-        for env in ${{ parameters.environments }}; do
+        for env in "${ENV_LIST[@]}"; do
           echo "➡️ Creating variable group for $env - $appid - $trackname"
           ./create-multi-env-vgs.sh "$env" "$appid" "$trackname" "$tracktype"
         done
