@@ -11,7 +11,13 @@ variables:
 parameters:
   - name: environments
     type: object
-    default: ['DEV', 'SIT', 'UAT', 'PT', 'PROD', 'DR']
+    default:
+      - DEV
+      - SIT
+      - UAT
+      - PT
+      - PROD
+      - DR
 
 steps:
   - task: Bash@3
@@ -36,7 +42,7 @@ EOF
         echo "✅ export-vars.sh created"
 
   - task: Bash@3
-    name: MakeMainScriptExecutable
+    name: MakeScriptExecutable
     displayName: "📜 Make create-multi-env-vgs.sh executable"
     inputs:
       targetType: 'inline'
@@ -51,13 +57,8 @@ EOF
       script: |
         source ./export-vars.sh
 
-        ENVIRONMENTS="${{ join(',', parameters.environments) }}"
-        IFS=',' read -ra ENV_LIST <<< "$ENVIRONMENTS"
-
-        echo "TRACKCOUNT: $TRACKCOUNT"
-        echo "Track 1 - Name: $track1_name, Type: $track1_type, AppId: $track1_appid, AppType: $track1_apptype"
-
-        for env in "${ENV_LIST[@]}"; do
-          echo "➡️ Creating variable group for $env - $track1_appid - $track1_name"
+        echo "🔁 Environments to process: ${{ parameters.environments }}"
+        for env in "${{ parameters.environments[@] }}"; do
+          echo "🧩 Track 1 - Creating variable group for $env"
           ./create-multi-env-vgs.sh "$env" "$track1_appid" "$track1_name" "$track1_type" "$track1_apptype"
         done
