@@ -14,38 +14,24 @@ variables:
   - group: devops-secrets-vg
 
 steps:
-  - script: |
-      chmod +x ./create-multi-env-vgs.sh
+  - checkout: self
 
-      echo "🔁 Environments to process:"
-      environments="${{ join(',', parameters.environments) }}"
-      IFS=',' read -ra ENV_LIST <<< "$environments"
-      # Export Azure DevOps variables to Bash
-      export ORG="$(ORG)"
-      export PROJECT="$(PROJECT)"
-      export AZURE_DEVOPS_PAT="$(AZURE_DEVOPS_PAT)"
-      # Manually export all track variables
-      export TRACKCOUNT=$(echo "$(TRACKCOUNT)")
-      export track1_name="$(track1_name)"
-      export track1_type="$(track1_type)"
-      export track1_appid="$(track1_appid)"
-      export track2_name="$(track2_name)"
-      export track2_type="$(track2_type)"
-      export track2_appid="$(track2_appid)"
-      # Add more if TRACKCOUNT > 2
+  - task: Bash@3
+    displayName: 'Set execute permission on scripts'
+    inputs:
+      targetType: inline
+      script: |
+        chmod +x ./process-vg-create-vg-source.sh
+        chmod +x ./create-multi-env-vgs.sh
 
-      echo "Found TRACKCOUNT=$TRACKCOUNT"
-
-      for ((i=1; i<=${TRACKCOUNT}; i++)); do
-        trackname=$(eval echo "\$track${i}_name")
-        tracktype=$(eval echo "\$track${i}_type")
-        appid=$(eval echo "\$track${i}_appid")
-
-        echo "🧩 Track $i: name=$trackname, type=$tracktype, appid=$appid"
-
-        for env in "${ENV_LIST[@]}"; do
-          echo "➡️ Creating variable group for $env - $appid - $trackname"
-          ./create-multi-env-vgs.sh "$env" "$appid" "$trackname" "$tracktype"
-        done
-      done
-    displayName: 'Create Env-specific Variable Groups from vg-create-vg-source'
+  - task: Bash@3
+    displayName: 'Create Env-specific Variable Groups'
+    inputs:
+      targetType: filePath
+      filePath: ./process-vg-create-vg-source.sh
+    env:
+      PARAM_ENVIRONMENTS: ${{ join(',', parameters.environments) }}
+      ORG: $(ORG)
+      PROJECT: $(PROJECT)
+      AZURE_DEVOPS_PAT: $(AZURE_DEVOPS_PAT)
+      # Also exports all vg-create-vg-source values at runtime
