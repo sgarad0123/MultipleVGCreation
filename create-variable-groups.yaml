@@ -14,47 +14,48 @@ variables:
   - group: devops-secrets-vg
 
 steps:
-  - script: |
-      echo "TRACKCOUNT: $(TRACKCOUNT)"
-      echo "track1_name: $(track1_name)"
-      echo "track1_type: $(track1_type)"
-      echo "track1_appid: $(track1_appid)"
-      echo "track1_apptype: $(track1_apptype)"
-    displayName: '🔍 Debug Track 1 Inputs'
 
   - script: |
-      chmod +x ./generate-export-vars.sh
-      ./generate-export-vars.sh
-    displayName: '🔧 Generate export-vars.sh'
-
-  - script: |
-      source ./export-vars.sh
-      chmod +x ./create-multi-env-vgs.sh
-
-      echo "🔁 Environments to process: ${{ join(',', parameters.environments) }}"
-      IFS=',' read -ra ENV_LIST <<< "${{ join(',', parameters.environments) }}"
+      echo "🔧 Generating export-vars.sh..."
+      echo '#!/bin/bash' > export-vars.sh
+      echo "export ORG=\"$(ORG)\"" >> export-vars.sh
+      echo "export PROJECT=\"$(PROJECT)\"" >> export-vars.sh
+      echo "export AZURE_DEVOPS_PAT=\"$(AZURE_DEVOPS_PAT)\"" >> export-vars.sh
+      echo "export TRACKCOUNT=$(TRACKCOUNT)" >> export-vars.sh
+      echo "" >> export-vars.sh
 
       for ((i=1; i<=${TRACKCOUNT}; i++)); do
-        name_var="track${i}_name"
-        type_var="track${i}_type"
-        appid_var="track${i}_appid"
-        apptype_var="track${i}_apptype"
-
-        TRACKNAME="${!name_var}"
-        TRACKTYPE="${!type_var}"
-        APPID="${!appid_var}"
-        APPTYPE="${!apptype_var}"
-
-        if [[ -z "$TRACKNAME" || -z "$TRACKTYPE" || -z "$APPID" || -z "$APPTYPE" ]]; then
-          echo "❌ ERROR: Missing variables for track$i"
-          exit 1
-        fi
-
-        echo "🧩 Track $i: name=$TRACKNAME, type=$TRACKTYPE, appid=$APPID, apptype=$APPTYPE"
-
-        for ENV in "${ENV_LIST[@]}"; do
-          echo "➡️ Creating variable group for $ENV - $APPID - $TRACKNAME"
-          ./create-multi-env-vgs.sh "$ENV" "$APPID" "$TRACKNAME" "$TRACKTYPE" "$APPTYPE"
+        for var in name type appid apptype; do
+          varname="track${i}_${var}"
+          value="$(eval echo "\${{ variables[$varname] }}")"
+          if [[ -z "$value" ]]; then
+            echo "❌ ERROR: Missing variables for track${i} ($var)"
+            exit 1
+          fi
+          echo "export $varname=\"$value\"" >> export-vars.sh
         done
       done
-    displayName: '🚀 Create Variable Groups for All Envs'
+
+      echo "✅ export-vars.sh created with:"
+      cat export-vars.sh
+    displayName: "🔧 Generate export-vars.sh"
+
+  - script: |
+      chmod +x ./export-vars.sh
+      source ./export-vars.sh
+
+      echo "🔁 Environments to process: ${{ join(',', parameters.environments) }}"
+      for ((i=1; i<=${TRACKCOUNT}; i++)); do
+        trackname=$(eval echo "\$track${i}_name")
+        tracktype=$(eval echo "\$track${i}_type")
+        appid=$(eval echo "\$track${i}_appid")
+        apptype=$(eval echo "\$track${i}_apptype")
+
+        echo "🧩 Track $i: name=$trackname, type=$tracktype, appid=$appid, apptype=$apptype"
+
+        for env in "${{ parameters.environments[@] }}"; do
+          echo "➡️ Creating variable group for $env - $appid - $trackname"
+          ./create-multi-env-vgs.sh "$env" "$appid" "$trackname" "$tracktype" "$apptype"
+        done
+      done
+    displayName: "🚀 Create Env Variable Groups"
