@@ -5,6 +5,9 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
+  # These variable groups are assumed to contain:
+  # vg-create-vg-source: ORG, PROJECT, track1_name, track1_type, track1_appid, track1_apptype
+  # devops-secrets-vg: AZURE_DEVOPS_PAT (marked as secret)
   - group: vg-create-vg-source
   - group: devops-secrets-vg
 
@@ -15,62 +18,66 @@ parameters:
 
 steps:
   - task: Bash@3
-    displayName: "🔧 Generate export-vars.sh"
+    displayName: "⚙️ Install jq and set permissions"
     inputs:
       targetType: 'inline'
       script: |
-        echo "🔧 Generating export-vars.sh..."
-        cat <<EOF > export-vars.sh
-        #!/bin/bash
-        export ORG="${ORG}"
-        export PROJECT="${PROJECT}"
-        export AZURE_DEVOPS_PAT="${AZURE_DEVOPS_PAT}"
-        export TRACKCOUNT=1
-        export track1_name="${track1_name}"
-        export track1_type="${track1_type}"
-        export track1_appid="${track1_appid}"
-        export track1_apptype="${track1_apptype}"
-        EOF
-        chmod +x export-vars.sh
-        echo "✅ export-vars.sh created"
-
-  - task: Bash@3
-    displayName: "🔐 Make create-multi-env-vgs.sh Executable"
-    inputs:
-      targetType: 'inline'
-      script: |
+        echo "Installing jq for JSON processing..."
+        sudo apt-get update && sudo apt-get install -y jq
+        echo "jq installed."
+        
+        echo "Making create-multi-env-vgs.sh executable..."
         chmod +x ./create-multi-env-vgs.sh
+        echo "Permissions set."
 
   - task: Bash@3
     displayName: "🚀 Create Variable Groups"
     inputs:
       targetType: 'inline'
+      # Explicitly pass required variables as environment variables to this task
+      # This ensures they are available within the script's scope
+      env:
+        ORG: $(ORG)
+        PROJECT: $(PROJECT)
+        AZURE_DEVOPS_PAT: $(AZURE_DEVOPS_PAT) # This is a secret variable
+        # Pass track1 variables directly
+        TRACK1_NAME: $(track1_name)
+        TRACK1_TYPE: $(track1_type)
+        TRACK1_APPID: $(track1_appid)
+        TRACK1_APPTYPE: $(track1_apptype)
       script: |
-        source ./export-vars.sh
+        echo "Starting Variable Group Creation process..."
 
-        # Corrected: Use the 'join' expression to convert the array parameter into a space-separated string
-        # before passing it to Bash.
-        # This is the key change to resolve "Unable to convert from Array to String. Value: Array".
+        # Access environment variables directly, no need for export-vars.sh
+        ORG="${ORG}"
+        PROJECT="${PROJECT}"
+        AZURE_DEVOPS_PAT="${AZURE_DEVOPS_PAT}"
+
+        trackname="${TRACK1_NAME}"
+        tracktype="${TRACK1_TYPE}"
+        appid="${TRACK1_APPID}"
+        apptype="${TRACK1_APPTYPE}"
+
+        if [[ -z "$trackname" || -z "$tracktype" || -z "$appid" || -z "$apptype" ]]; then
+          echo "❌ ERROR: Missing track1 input from variable group."
+          echo "Please ensure 'track1_name', 'track1_type', 'track1_appid', 'track1_apptype' are set in 'vg-create-vg-source'."
+          exit 1
+        fi
+
+        echo "🧩 Track 1 details: name=$trackname, type=$tracktype, appid=$appid, apptype=$apptype"
+        echo "Azure DevOps Org: $ORG, Project: $PROJECT"
+
+        # Convert the environments parameter array into a space-separated string for Bash
+        # This resolves the "Unable to convert from Array to String" error
         environments_str="${{ join(' ', parameters.environments) }}"
-        
-        # Now, split the space-separated string into a Bash array
         IFS=' ' read -r -a environments_array <<< "$environments_str"
 
         echo "🔁 Environments to process: ${environments_array[@]}"
 
-        trackname="${track1_name}"
-        tracktype="${track1_type}"
-        appid="${track1_appid}"
-        apptype="${track1_apptype}"
-
-        if [[ -z "$trackname" || -z "$tracktype" || -z "$appid" || -z "$apptype" ]]; then
-          echo "❌ ERROR: Missing input for track1"
-          exit 1
-        fi
-
-        echo "🧩 Track 1: name=$trackname, type=$tracktype, appid=$appid, apptype=$apptype"
-
         for env in "${environments_array[@]}"; do
-          echo "➡️ Creating variable group for $env - $appid - $trackname"
-          ./create-multi-env-vgs.sh "$env" "$appid" "$trackname" "$tracktype" "$apptype"
+          echo "➡️ Attempting to create variable group for environment: $env"
+          # Pass ORG, PROJECT, and PAT directly as arguments to the script
+          ./create-multi-env-vgs.sh "$env" "$appid" "$trackname" "$tracktype" "$apptype" "$ORG" "$PROJECT" "$AZURE_DEVOPS_PAT"
         done
+
+        echo "Variable Group Creation process completed."
