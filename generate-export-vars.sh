@@ -1,27 +1,29 @@
 #!/bin/bash
+set -e
 
 echo "🔧 Generating export-vars.sh..."
 
-# Create clean export file
-echo '#!/bin/bash' > export-vars.sh
-echo "export ORG=\"$ORG\"" >> export-vars.sh
-echo "export PROJECT=\"$PROJECT\"" >> export-vars.sh
-echo "export AZURE_DEVOPS_PAT=\"$AZURE_DEVOPS_PAT\"" >> export-vars.sh
-echo "export TRACKCOUNT=$TRACKCOUNT" >> export-vars.sh
-echo "" >> export-vars.sh
-echo "# Dynamically export all trackN_* variables" >> export-vars.sh
+OUTPUT_FILE="export-vars.sh"
+echo '#!/bin/bash' > "$OUTPUT_FILE"
+echo "export ORG=\"${ORG}\"" >> "$OUTPUT_FILE"
+echo "export PROJECT=\"${PROJECT}\"" >> "$OUTPUT_FILE"
+echo "export AZURE_DEVOPS_PAT=\"${AZURE_DEVOPS_PAT}\"" >> "$OUTPUT_FILE"
 
-for ((i=1; i<=TRACKCOUNT; i++)); do
+# Export TRACKCOUNT
+echo "export TRACKCOUNT=${TRACKCOUNT}" >> "$OUTPUT_FILE"
+
+# Loop through each track
+for ((i=1; i<=${TRACKCOUNT}; i++)); do
   for key in name type appid apptype; do
-    varname="track${i}_${key}"
-    value="${!varname}"
-    if [[ -z "$value" ]]; then
-      echo "❌ ERROR: Missing variables for track$i ($key)"
+    VAR_NAME="track${i}_${key}"
+    VALUE="${!VAR_NAME}"
+    if [[ -z "$VALUE" ]]; then
+      echo "❌ ERROR: Missing variables for track${i} ($key)"
       exit 1
     fi
-    echo "export $varname=\"$value\"" >> export-vars.sh
+    echo "export $VAR_NAME=\"$VALUE\"" >> "$OUTPUT_FILE"
   done
 done
 
-echo "✅ export-vars.sh created:"
-cat export-vars.sh
+echo "✅ export-vars.sh created with:"
+cat "$OUTPUT_FILE"
