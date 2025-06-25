@@ -36,16 +36,6 @@ steps:
       AZURE_DEVOPS_PAT: $(AZURE_DEVOPS_PAT)
       TRACKCOUNT: $(trackcount)
 
-      # Export Track 1
-      track1_name: $(track1_name)
-      track1_type: $(track1_type)
-      track1_appid: $(track1_appid)
-      track1_apptype: $(track1_apptype)
-
-      # Export Track 2
-      track2_name: $(track2_name)
-      track2_type: $(track2_type)
-      track2_appid: $(track2_appid)
-      track2_apptype: $(track2_apptype)
-
-      # ➕ Add more trackN_* if TRACKCOUNT > 2
+      # Flat export: all track variables are automatically exposed
+      # For example: track1_name, track2_name, etc.
+      # No hardcoding required here – process script will loop over them
