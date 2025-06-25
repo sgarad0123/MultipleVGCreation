@@ -16,26 +16,34 @@ variables:
 steps:
   - script: |
       echo "🔧 Generating export-vars.sh..."
-      echo '#!/bin/bash' > export-vars.sh
 
+      echo '#!/bin/bash' > export-vars.sh
       echo "export ORG=\"$(ORG)\"" >> export-vars.sh
       echo "export PROJECT=\"$(PROJECT)\"" >> export-vars.sh
       echo "export AZURE_DEVOPS_PAT=\"$(AZURE_DEVOPS_PAT)\"" >> export-vars.sh
       echo "export TRACKCOUNT=$(TRACKCOUNT)" >> export-vars.sh
 
-      for i in {1..10}; do
-        echo "export track${i}_name=\"$(eval echo \${{ variables['track${i}_name'] }})\"" >> export-vars.sh
-        echo "export track${i}_type=\"$(eval echo \${{ variables['track${i}_type'] }})\"" >> export-vars.sh
-        echo "export track${i}_appid=\"$(eval echo \${{ variables['track${i}_appid'] }})\"" >> export-vars.sh
-        echo "export track${i}_apptype=\"$(eval echo \${{ variables['track${i}_apptype'] }})\"" >> export-vars.sh
+      echo "" >> export-vars.sh
+      echo "# Dynamically export all trackN_* variables" >> export-vars.sh
+
+      count=$(TRACKCOUNT)
+      for i in $(seq 1 $count); do
+        for field in name type appid apptype; do
+          varname="track${i}_${field}"
+          value="$(echo ${{ variables[varname] }})"
+          echo "export ${varname}=\"${value}\"" >> export-vars.sh
+        done
       done
 
       chmod +x export-vars.sh
-      echo "✅ export-vars.sh content:"
+      echo "✅ export-vars.sh created with:"
       cat export-vars.sh
-    displayName: '🔧 Build export-vars.sh dynamically'
+    displayName: '🔧 Dynamically Generate export-vars.sh'
 
   - script: |
+      chmod +x export-vars.sh
+      source ./export-vars.sh
+
       chmod +x ./process-vg-create-vg-source.sh
       ./process-vg-create-vg-source.sh "${{ join(',', parameters.environments) }}"
-    displayName: '🚀 Create all env variable groups'
+    displayName: '🚀 Create Env-Specific Variable Groups'
