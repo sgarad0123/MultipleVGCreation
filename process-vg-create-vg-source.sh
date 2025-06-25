@@ -1,36 +1,31 @@
 #!/bin/bash
-
 set -e
 
-echo "🔁 Environments to process: DEV, SIT, UAT, PT, PROD, DR"
+echo "🔁 Environments to process: $PARAM_ENVIRONMENTS"
+IFS=',' read -ra ENV_LIST <<< "$PARAM_ENVIRONMENTS"
 
-if [[ -z "$trackcount" ]]; then
+if [[ -z "$TRACKCOUNT" ]]; then
   echo "❌ ERROR: 'trackcount' not defined in vg-create-vg-source"
   exit 1
 fi
 
-echo "Found TRACKCOUNT=$trackcount"
+echo "Found TRACKCOUNT=$TRACKCOUNT"
 
-for i in $(seq 1 "$trackcount"); do
-  NAME_VAR="track${i}_name"
-  TYPE_VAR="track${i}_type"
-  APPID_VAR="track${i}_appid"
-  APPTYPE_VAR="track${i}_apptype"
+for ((i=1; i<=TRACKCOUNT; i++)); do
+  trackname=$(eval echo "\$track${i}_name")
+  tracktype=$(eval echo "\$track${i}_type")
+  appid=$(eval echo "\$track${i}_appid")
+  apptype=$(eval echo "\$track${i}_apptype")
 
-  TRACK_NAME="${!NAME_VAR}"
-  TRACK_TYPE="${!TYPE_VAR}"
-  APP_ID="${!APPID_VAR}"
-  APP_TYPE="${!APPTYPE_VAR}"
-
-  if [[ -z "$TRACK_NAME" || -z "$TRACK_TYPE" || -z "$APP_ID" || -z "$APP_TYPE" ]]; then
-    echo "❌ ERROR: Missing input for track $i"
+  if [[ -z "$trackname" || -z "$tracktype" || -z "$appid" || -z "$apptype" ]]; then
+    echo "❌ ERROR: Missing track variables for track$i"
     continue
   fi
 
-  echo "🧩 Track $i: name=${TRACK_NAME}, type=${TRACK_TYPE}, appid=${APP_ID}, apptype=${APP_TYPE}"
+  echo "🧩 Track $i: name=$trackname, type=$tracktype, appid=$appid, apptype=$apptype"
 
-  for ENV in DEV SIT UAT PT PROD DR; do
-    echo "➡️ Creating variable group for $ENV - $APP_ID - $TRACK_NAME"
-    ./create-multi-env-vgs.sh "$ENV" "$APP_ID" "$TRACK_NAME" "$TRACK_TYPE" "$APP_TYPE"
+  for env in "${ENV_LIST[@]}"; do
+    echo "➡️ Creating variable group for $env - $appid - $trackname"
+    ./create-multi-env-vgs.sh "$env" "$appid" "$trackname" "$tracktype" "$apptype"
   done
 done
