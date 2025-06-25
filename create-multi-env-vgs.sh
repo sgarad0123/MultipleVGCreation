@@ -17,69 +17,54 @@ ORG="${ORG}"
 PROJECT="${PROJECT}"
 PAT="${AZURE_DEVOPS_PAT}"
 
-if [[ -z "$ORG" || -z "$PROJECT" || -z "$PAT" ]]; then
-  echo "❌ ERROR: Missing org, project or PAT env variables"
-  exit 1
-fi
-
 ENCODED_PAT=$(printf ":%s" "$PAT" | base64 | tr -d '\n')
 AUTH_HEADER="Authorization: Basic $ENCODED_PAT"
 
+# Get Project ID
 PROJECT_ID=$(curl -s -H "$AUTH_HEADER" \
   "https://dev.azure.com/$ORG/_apis/projects/$PROJECT?api-version=7.1-preview.1" \
   | jq -r '.id')
 
 VG_NAME="${ENV}-${APPID}-${TRACKNAME}-VG"
-ENV_LC="$(echo "$ENV" | awk '{print tolower($0)}')"
 
-# sys-AppCriticality based on apptype
+# AppCriticality Logic
 case "$APPTYPE" in
-  chatbot)            CRIT="chatbot" ;;
-  wa)                 CRIT="bcweb" ;;
-  contractautweb)     CRIT="contractauthweb" ;;
-  contractautapi)     CRIT="contractauthapi" ;;
-  api|func|bj)        CRIT="bcapi" ;;
-  *)                  CRIT="bcapi" ;;
+  chatbot) CRIT="chatbot" ;;
+  wa) CRIT="bcweb" ;;
+  contractautweb) CRIT="contractauthweb" ;;
+  contractautapi) CRIT="contractauthapi" ;;
+  api|func|bj) CRIT="bcapi" ;;
+  *) CRIT="bcapi" ;;
 esac
 
-# sys-Namespace logic
+# Namespace Logic
+ENV_LC=$(echo "$ENV" | tr '[:upper:]' '[:lower:]')
+
 if [[ "$APPTYPE" == "chatbot" && "$TRACKTYPE" == "wa" ]]; then
-  case "$ENV" in
-    DEV)   NS="devintweb-bc" ;;
-    SIT)   NS="sitweb-bc" ;;
-    UAT)   NS="uatweb-bc" ;;
-    PT)    NS="ptweb-bc" ;;
-    PROD|DR) NS="chatbotweb" ;;
-    *)     NS="${ENV_LC}web-bc" ;;
-  esac
-elif [[ "$ENV" == "DEV" ]]; then
-  NS="devintapi-bc"
+  if [[ "$ENV" =~ ^(PROD|DR)$ ]]; then
+    NS="chatbotweb"
+  else
+    NS="${ENV_LC}web-bc"
+  fi
 elif [[ "$TRACKTYPE" == "wa" ]]; then
-  case "$ENV" in
-    SIT)   NS="sitweb-bc" ;;
-    UAT)   NS="uatweb-bc" ;;
-    PT)    NS="ptweb-bc" ;;
-    PROD|DR) NS="bcweb" ;;
-    *)     NS="${ENV_LC}web-bc" ;;
-  esac
+  if [[ "$ENV" =~ ^(PROD|DR)$ ]]; then
+    NS="bcweb"
+  else
+    NS="${ENV_LC}web-bc"
+  fi
+elif [[ "$ENV" == "DEV" ]]; then
+  NS="${ENV_LC}intapi-bc"
 else
-  case "$ENV" in
-    PROD|DR) NS="bcapi" ;;
-    *)       NS="${ENV_LC}api-bc" ;;
-  esac
+  NS="bcapi"
 fi
 
-SECRET_NAME="$(echo "${ENV}-${APPID}-${TRACKTYPE}-${TRACKNAME}-secret" | tr '[:upper:]' '[:lower:]')"
+# Secret Resource Name
+SECRET_NAME=$(echo "${ENV}-${APPID}-${TRACKTYPE}-${TRACKNAME}-secret" | tr '[:upper:]' '[:lower:]')
+
+# Image Path
 IMAGE_PATH="\$(ACRPath-NonProd)/\$(${APPID}-${TRACKNAME}-ACRRepositoryName)"
 
-echo "----------------------------------------"
-echo "🔧 Creating Variable Group: $VG_NAME"
-echo "📌 ACR Image Path: $IMAGE_PATH"
-echo "📌 Namespace: $NS"
-echo "📌 AppCriticality: $CRIT"
-echo "📌 Secret Resource Name: $SECRET_NAME"
-echo "----------------------------------------"
-
+# Final JSON
 cat > variables.json <<EOF
 {
   "MSI-Identitybinding": { "value": "default", "isSecret": false },
@@ -90,6 +75,7 @@ cat > variables.json <<EOF
 }
 EOF
 
+# Create Variable Group
 BODY=$(jq -n \
   --arg name "$VG_NAME" \
   --arg projectId "$PROJECT_ID" \
@@ -110,8 +96,10 @@ BODY=$(jq -n \
     ]
   }')
 
-URL="https://dev.azure.com/$ORG/$PROJECT/_apis/distributedtask/variablegroups?api-version=7.1-preview.2"
 RESPONSE_FILE=$(mktemp)
+URL="https://dev.azure.com/$ORG/$PROJECT/_apis/distributedtask/variablegroups?api-version=7.1-preview.2"
+
+echo "📦 Creating variable group: $VG_NAME"
 
 HTTP_CODE=$(curl --http1.1 -s -w "%{http_code}" -o "$RESPONSE_FILE" -X POST \
   -H "$AUTH_HEADER" \
