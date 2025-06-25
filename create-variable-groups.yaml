@@ -14,39 +14,33 @@ parameters:
     default: ['DEV', 'SIT', 'UAT', 'PT', 'PROD', 'DR']
 
 steps:
-  # Step 1: Make generate-export-vars.sh executable and run it
   - task: Bash@3
-    displayName: 🔧 Generate export-vars.sh (with permission)
+    displayName: 🔧 Set permissions for scripts
     inputs:
       targetType: 'inline'
       script: |
-        echo "🔧 Making generate-export-vars.sh executable..."
         chmod +x ./generate-export-vars.sh
-        ./generate-export-vars.sh
-
-  # Step 2: Make create-multi-env-vgs.sh executable
-  - task: Bash@3
-    displayName: 🔧 Set permission for create-multi-env-vgs.sh
-    inputs:
-      targetType: 'inline'
-      script: |
         chmod +x ./create-multi-env-vgs.sh
 
-  # Step 3: Create variable groups using generated export-vars.sh
   - task: Bash@3
-    displayName: 🚀 Create Env Variable Groups for 1 Track
+    displayName: 🔧 Generate export-vars.sh
+    inputs:
+      targetType: 'filePath'
+      filePath: ./generate-export-vars.sh
+
+  - task: Bash@3
+    displayName: 🚀 Create Environment Variable Groups (Track 1)
     inputs:
       targetType: 'inline'
       script: |
         source ./export-vars.sh
 
-        echo "🔁 Environments to process: ${{ join(',', parameters.environments) }}"
+        echo "🔁 Environments to process: ${parameters.environments[*]}"
 
-        # Extract track 1 details
-        trackname="${track1_name}"
-        tracktype="${track1_type}"
-        appid="${track1_appid}"
-        apptype="${track1_apptype}"
+        trackname="$track1_name"
+        tracktype="$track1_type"
+        appid="$track1_appid"
+        apptype="$track1_apptype"
 
         if [[ -z "$trackname" || -z "$tracktype" || -z "$appid" || -z "$apptype" ]]; then
           echo "❌ ERROR: Missing input for track1"
@@ -55,7 +49,7 @@ steps:
 
         echo "🧩 Track 1: name=$trackname, type=$tracktype, appid=$appid, apptype=$apptype"
 
-        for env in "${{ parameters.environments[@] }}"; do
+        for env in "${parameters.environments[@]}"; do
           echo "➡️ Creating variable group for $env - $appid - $trackname"
           ./create-multi-env-vgs.sh "$env" "$appid" "$trackname" "$tracktype" "$apptype"
         done
