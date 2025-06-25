@@ -25,18 +25,30 @@ steps:
         chmod +x ./create-multi-env-vgs.sh
 
   - task: Bash@3
-    displayName: 'Export all trackN_* variables dynamically'
+    displayName: 'Generate export-vars.sh from pipeline variables'
     name: exportTrackVars
     inputs:
       targetType: inline
       script: |
-        printenv | grep -E '^track[0-9]+_' > export-vars.sh
-        sed -i 's/^/export /' export-vars.sh
-        echo "✅ Dynamic export-vars.sh created with:"
+        echo "📦 Generating export-vars.sh from defined variables"
+        > export-vars.sh
+
+        for i in $(seq 1 50); do
+          for key in name type appid apptype; do
+            varName="track${i}_${key}"
+            value="$(eval echo "\$$varName")"
+            if [[ -n "$value" ]]; then
+              echo "export $varName=\"$value\"" >> export-vars.sh
+            fi
+          done
+        done
+
+        echo "export TRACKCOUNT=$(TRACKCOUNT)" >> export-vars.sh
+        echo "✅ Contents of export-vars.sh:"
         cat export-vars.sh
 
   - task: Bash@3
-    displayName: 'Run Variable Group Creation'
+    displayName: 'Run Multi-Env Variable Group Creation'
     inputs:
       targetType: filePath
       filePath: ./process-vg-create-vg-source.sh
@@ -45,4 +57,3 @@ steps:
       ORG: $(ORG)
       PROJECT: $(PROJECT)
       AZURE_DEVOPS_PAT: $(AZURE_DEVOPS_PAT)
-      TRACKCOUNT: $(trackcount)
