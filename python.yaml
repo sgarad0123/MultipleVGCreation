@@ -27,5 +27,5 @@ steps:
 
   - script: |
       echo "Verifying requests"
-      pip show requests
+      python3 -m pip show requests
     displayName: "Verify requests installation"
