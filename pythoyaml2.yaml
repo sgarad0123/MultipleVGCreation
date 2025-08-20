@@ -1,0 +1,11 @@
+trigger: none
+
+pool:
+  name: AKS
+  vmImage: 'ubuntu-latest'
+
+steps:
+  - script: |
+      echo "running script"
+      python3 scripts/hellowworld.py
+    displayName: "Install requests package"
