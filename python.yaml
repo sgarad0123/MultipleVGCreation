@@ -5,21 +5,19 @@ pool:
   vmImage: 'ubuntu-latest'
 
 steps:
-  - task: UsePythonVersion@0
-    inputs:
-      versionSpec: '3.x'
-      addToPath: true
-    displayName: "Set up Python 3.x"
-
   - script: |
-      python --version
-      pip --version
+      echo "Checking Python and Pip"
+      python --version || python --version
+      pip --version || pip --version
     displayName: "Check Python & Pip"
 
   - script: |
-      pip install requests
+      echo "Installing requests"
+      python -m pip install --upgrade pip
+      python -m pip install requests
     displayName: "Install requests package"
 
   - script: |
+      echo "Verifying requests"
       python -m pip show requests
     displayName: "Verify requests installation"
