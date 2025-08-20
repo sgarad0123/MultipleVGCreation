@@ -9,17 +9,23 @@ steps:
       echo "Checking Python"
       python3 --version
 
-      echo "Bootstrapping pip (if missing)..."
-      python3 -m ensurepip --upgrade || true
-      python3 -m pip install --upgrade pip
+      echo "Installing pip (official get-pip.py)..."
+      curl -sS https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+      python3 get-pip.py --user
+
+      echo "Updating PATH so pip is available"
+      export PATH=$PATH:~/.local/bin
+
+      echo "Verify pip"
+      pip --version
     displayName: "Ensure Python & Pip"
 
   - script: |
       echo "Installing requests"
-      python3 -m pip install requests
+      pip install --user requests
     displayName: "Install requests package"
 
   - script: |
       echo "Verifying requests"
-      python3 -m pip show requests
+      pip show requests
     displayName: "Verify requests installation"
