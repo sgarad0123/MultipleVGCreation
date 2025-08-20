@@ -1,30 +1,24 @@
-trigger: none   # manual run
+trigger: none   # Run manually
 
 pool:
   name: AKS
-  vmImage: 'ubuntu-latest'   # can change to ubuntu-latest if needed
+  vmImage: 'ubuntu-latest'
 
 steps:
   - script: |
       echo "Checking if Python is installed..."
-      python --version || echo "Python not found"
-    displayName: "Check Python availability"
-
-  - script: |
-      echo "Installing Python if not present..."
-      if ! command -v python &> /dev/null
+      if command -v python3 &> /dev/null
       then
-        echo "Python not installed. Installing now..."
-        # On Windows:
-        choco install -y python
-        # On Linux (uncomment if pool is ubuntu):
-        # sudo apt-get update && sudo apt-get install -y python3
+        echo "Python is already installed: $(python3 --version)"
       else
-        echo "Python already installed"
+        echo "Python not found. Installing now..."
+        sudo apt-get update
+        sudo apt-get install -y python3 python3-pip
       fi
-    displayName: "Install Python if missing"
+    displayName: "Check & Install Python"
 
   - script: |
-      echo "Final check: Python version"
-      python --version
+      echo "Final check:"
+      python3 --version
+      pip3 --version
     displayName: "Verify Python installation"
