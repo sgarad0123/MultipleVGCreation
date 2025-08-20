@@ -2,23 +2,18 @@ trigger: none   # Run manually
 
 pool:
   name: AKS
-  vmImage: 'ubuntu-latest'
+  vmImage: 'ubuntu-latest'   # or windows-latest
 
 steps:
   - script: |
-      echo "Checking if Python is installed..."
-      if command -v python3 &> /dev/null
-      then
-        echo "Python is already installed: $(python3 --version)"
-      else
-        echo "Python not found. Installing now..."
-        sudo apt-get update
-        sudo apt-get install -y python3 python3-pip
-      fi
-    displayName: "Check & Install Python"
-
-  - script: |
-      echo "Final check:"
       python3 --version
       pip3 --version
-    displayName: "Verify Python installation"
+    displayName: "Check Python & Pip"
+
+  - script: |
+      pip3 install requests
+    displayName: "Install requests package"
+
+  - script: |
+      python3 -m pip show requests
+    displayName: "Verify requests installation"
