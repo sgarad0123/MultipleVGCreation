@@ -2,18 +2,22 @@ trigger: none   # Run manually
 
 pool:
   name: AKS
-  vmImage: 'ubuntu-latest'   # or windows-latest
+  vmImage: 'ubuntu-latest'
 
 steps:
   - script: |
-      python --version
-      pip --version
-    displayName: "Check Python & Pip"
+      echo "Checking Python..."
+      python3 --version
+
+      echo "Installing pip if missing..."
+      sudo apt-get update
+      sudo apt-get install -y python3-pip
+    displayName: "Ensure Python & Pip"
 
   - script: |
-      pip install requests
+      pip3 install requests
     displayName: "Install requests package"
 
   - script: |
-      python -m pip show requests
+      python3 -m pip show requests
     displayName: "Verify requests installation"
