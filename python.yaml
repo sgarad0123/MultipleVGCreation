@@ -1,4 +1,4 @@
-trigger: none   # Run manually
+trigger: none
 
 pool:
   name: AKS
@@ -6,14 +6,16 @@ pool:
 
 steps:
   - script: |
-      echo "Checking Python and Pip"
-      python3 --version || python --version
-      pip3 --version || pip --version
-    displayName: "Check Python & Pip"
+      echo "Checking Python"
+      python3 --version
+
+      echo "Bootstrapping pip (if missing)..."
+      python3 -m ensurepip --upgrade || true
+      python3 -m pip install --upgrade pip
+    displayName: "Ensure Python & Pip"
 
   - script: |
       echo "Installing requests"
-      python3 -m pip install --upgrade pip
       python3 -m pip install requests
     displayName: "Install requests package"
 
