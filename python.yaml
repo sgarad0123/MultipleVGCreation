@@ -22,7 +22,7 @@ steps:
 
   - script: |
       echo "Installing requests"
-      pip install --user requests
+      python3 -m pip install --user requests
     displayName: "Install requests package"
 
   - script: |
