@@ -5,19 +5,21 @@ pool:
   vmImage: 'ubuntu-latest'
 
 steps:
-  - script: |
-      echo "Checking Python..."
-      python3 --version
-
-      echo "Installing pip if missing..."
-       apt-get update
-       apt-get install -y python3-pip
-    displayName: "Ensure Python & Pip"
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: '3.x'
+      addToPath: true
+    displayName: "Set up Python 3.x"
 
   - script: |
-      pip3 install requests
+      python --version
+      pip --version
+    displayName: "Check Python & Pip"
+
+  - script: |
+      pip install requests
     displayName: "Install requests package"
 
   - script: |
-      python3 -m pip show requests
+      python -m pip show requests
     displayName: "Verify requests installation"
